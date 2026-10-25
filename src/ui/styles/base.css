@@ -13,14 +13,34 @@ body {
   overflow: hidden;
   background-color: var(--bg-base);
   color: var(--text-primary);
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  font-family: var(--font-body);
   -webkit-text-size-adjust: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display);
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Numeric elements use tabular nums */
+.tabular-nums,
+[data-numeric] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* Shared focus ring used by every interactive component */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px rgba(61, 165, 255, 0.25);
 }
 
 #game-root {
@@ -49,4 +69,28 @@ body {
 /* Allow interactive UI overlay children to opt into pointer events */
 #ui-root > * {
   pointer-events: auto;
+}
+
+/* Styleguide mode overrides */
+html.is-styleguide,
+html.is-styleguide body {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  pointer-events: auto;
+  user-select: auto;
+  -webkit-user-select: auto;
+}
+
+html.is-styleguide #ui-root {
+  position: relative;
+  inset: auto;
+  pointer-events: auto;
+  touch-action: auto;
+  user-select: auto;
+  -webkit-user-select: auto;
+  min-height: 100vh;
+  padding: 0;
 }

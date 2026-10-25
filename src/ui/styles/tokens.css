@@ -8,11 +8,15 @@
   --text-primary: #f2f5fa;
   --text-secondary: #a8b3c7;
   --text-disabled: #5c677d;
-  --accent: #3da5ff; /* day; dusk #FF8A3D; night #00E5FF */
+  --accent: #3da5ff; /* day; dusk #ff8a3d; night #00e5ff */
   --success: #3ddc84;
   --warning: #ffc933;
   --danger: #ff4d5e;
   --gems: #c084ff;
+
+  /* fonts */
+  --font-display: 'Chakra Petch', system-ui, sans-serif;
+  --font-body: 'Barlow', system-ui, sans-serif;
 
   /* spacing */
   --space-1: 4px;
@@ -45,6 +49,24 @@
   --dur-slow: 320ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:root[data-time='day'] {
+  --accent: #3da5ff;
+}
+
+:root[data-time='dusk'] {
+  --accent: #ff8a3d;
+}
+
+:root[data-time='night'] {
+  --accent: #00e5ff;
+}
+
+:root[data-reduced-motion='true'] {
+  --dur-fast: 0.01ms;
+  --dur-base: 0.01ms;
+  --dur-slow: 0.01ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
