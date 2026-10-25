@@ -3,6 +3,7 @@ import './ui/styles/tokens.css';
 import './ui/styles/base.css';
 import './ui/styles/components.css';
 import './ui/styles/hud.css';
+import './ui/styles/touchControls.css';
 import { App } from './app/App';
 import { GameInfo } from './data/GameInfo';
 
