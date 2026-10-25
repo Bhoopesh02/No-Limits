@@ -1,0 +1,18 @@
+{
+    "name": "CarGame.Race",
+    "rootNamespace": "CarGame.Race",
+    "references": [
+        "CarGame.Core",
+        "CarGame.Data",
+        "CarGame.Vehicle"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

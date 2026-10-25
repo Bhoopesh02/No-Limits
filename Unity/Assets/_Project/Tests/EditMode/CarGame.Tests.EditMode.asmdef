@@ -1,0 +1,28 @@
+{
+    "name": "CarGame.Tests.EditMode",
+    "rootNamespace": "CarGame.Tests.EditMode",
+    "references": [
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "CarGame.Core",
+        "CarGame.Data",
+        "CarGame.Services",
+        "CarGame.Input",
+        "CarGame.Vehicle"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

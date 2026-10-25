@@ -1,0 +1,23 @@
+{
+    "name": "CarGame.Editor",
+    "rootNamespace": "CarGame.Editor",
+    "references": [
+        "CarGame.Core",
+        "CarGame.Data",
+        "CarGame.Services",
+        "CarGame.Vehicle",
+        "CarGame.Input",
+        "CarGame.UI"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
