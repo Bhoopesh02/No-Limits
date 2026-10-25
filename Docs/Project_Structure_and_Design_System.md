@@ -1,520 +1,344 @@
-Mobile Car Game: Project Structure and Design System
-Draft, October 17, 2026
-1. Programming Language Decision
-Decision: C# for the game, HLSL for shaders, TypeScript for the backend and Python for tools.
-Layer
-Language
-Why
-Gameplay, UI, editor tools (Unity)
-C#
-Native to Unity, strongly typed, good async support, Burst and Jobs for hot code, the biggest pool of tutorials and assets
-Shaders
-HLSL (Shader Graph plus hand-written URP shaders)
-Car paint, glass, wet roads and sky need custom shaders
-Backend functions
-TypeScript (Firebase Cloud Functions)
-Quick to start and familiar to web developers. Handles receipts, leaderboards and replay checks
-Build and asset tools
-Python
-Blender export scripts, asset validators, CI helpers
-Native plugins (only if needed)
-Kotlin (Android) and Swift (iOS)
-Thin plugins for thermal state, haptics and store features
-Options considered
-Option
-Verdict
-C++ with Unreal
-Great visuals, but heavier builds, a higher minimum device and slower iteration for a first mobile racer
-GDScript with Godot
-Light and friendly, but fewer racing assets, tools and mobile profiling options
-Kotlin and Swift (native)
-Two codebases and no engine tools for 3D, physics or lighting
-JavaScript with Three.js
-Fine for web demos, but cannot match native performance for detailed cars and four graphics tiers
-Rust with Bevy
-Promising, but mobile tooling and asset pipeline are still immature
-C# with Unity
-Chosen: best balance of mobile performance, tools, assets and learning resources
-C# coding rules
-One public class per file, and the file name equals the class name
-PascalCase for types and methods, camelCase for fields, an underscore prefix for private fields (_speed)
-Namespaces mirror folders: CarGame.Vehicle, CarGame.AI, CarGame.UI
-One assembly definition per module
-No allocations in Update: no LINQ, no string concatenation, no new lists per frame
-ScriptableObjects for data, events for communication between modules, interfaces at module borders
-Async or coroutines for loading, never blocking calls on the main thread
-Optional: UniTask for allocation-free async
-2. Folder Structure
-Repository
-CarGame/  .github/workflows/      CI builds and tests  Docs/                   design docs, art bible, style guide  Tools/    blender/              export and LOD scripts (Python)    validators/           asset and naming checks (Python)    build/                build and release scripts  Backend/    functions/src/        Cloud Functions (TypeScript)  Unity/    Assets/      _Project/           everything you make      ThirdParty/         asset store packs and plugins    Packages/    ProjectSettings/  .gitignore  .gitattributes          Git LFS rules  README.md
-Unity project (Assets/_Project)
-_Project/  Art/    Cars/      Lamborghini/        Models, Textures, Materials, Prefabs, Animations      Bugatti/      Supra/      BMW_M4/      Shared/             wheels, tires, glass, lights, decals    Tracks/      CoastalCityHighway/ Chunks, Lightmaps, Materials, Splines, Props      NeonDowntown/      MountainSerpentine/      DesertCanyon/      ForestRally/      AirportRunwayLoop/    Environment/          Buildings, Props, Vegetation, Roads, Decals, Skyboxes    VFX/                  Particles, Trails, Weather, Nitro    Shaders/              CarPaint, Glass, Road, Water, Sky, UI    UI/      Sprites/            Icons, Backgrounds, Frames      Atlases/      Fonts/              source files and TextMeshPro font assets  Audio/    Music/  SFX/  Ambience/  FMOD/  Data/    Cars/  Tracks/  Events/  Upgrades/  Economy/    TimeOfDay/  GraphicsTiers/  UITheme/  Prefabs/    Core/  Race/  UI/  Traffic/  Scenes/    Boot/  MainMenu/  Garage/  Race/  Debug/  StyleGuide/  Scripts/    Core/  Services/  Vehicle/  AI/  Race/    Environment/  Input/  UI/  Data/  Editor/  Settings/    URP/                  Mobile_Low, Mobile_Med, Mobile_High, Mobile_Max    Volumes/              post-processing profiles per tier and time of day    Quality/  Localization/  Plugins/    Android/  iOS/  Tests/    EditMode/  PlayMode/
-Folder rules
-Everything you create lives in _Project, so imported packs never mix with your files.
-No spaces in names, and PascalCase for folders.
-One folder per car and per track, with the same sub-folders in each.
-Do not use Resources folders. Load content through Addressables, grouped by car, track and tier.
-Git setup
-Git LFS for: .fbx, .blend, .png, .jpg, .tga, .psd, .exr, .wav, .ogg, .mp3, .mp4, .ttf, .otf, .bank
-.gitignore for: Library/, Temp/, Obj/, Build/, Builds/, Logs/, UserSettings/, .vs/, .idea/, *.csproj, *.sln
-Naming conventions
-Asset
-Prefix or suffix
-Example
-Static mesh
-SM_
-SM_Supra_Body
-Skeletal mesh
-SK_
-SK_Traffic_Bus
-Texture
-T_ with _BC (base color), _N (normal), _ORM (occlusion, roughness, metallic), _E (emissive)
-T_Supra_Body_BC
-Material
-M_
-M_CarPaint_Supra
-Shader
-SH_
-SH_CarPaint
-Prefab
-Car_, Track_, UI_ plus name and tier
-Car_Supra_Max
-Animation
-A_
-A_Supra_DoorOpen
-Audio
-SFX_, MUS_, AMB_
-SFX_Nitro_On
-ScriptableObject
-Type name plus name
-CarData_Supra
-UI sprite
-UI_
-UI_Icon_Nitro
-Scene
-Purpose_Name
-Race_CoastalCityHighway
-3. File Structure
-Scripts (C#)
-Scripts/  Core/    GameBootstrap.cs  GameStateMachine.cs  EventBus.cs    ServiceLocator.cs  SceneLoader.cs  Services/    SaveService.cs  CloudSaveService.cs  AudioService.cs    GraphicsService.cs  AdsService.cs  IapService.cs    AnalyticsService.cs  RemoteConfigService.cs  Vehicle/    CarController.cs  Engine.cs  Gearbox.cs  Drivetrain.cs    Suspension.cs  WheelTire.cs  Aerodynamics.cs  NitroSystem.cs    DriftScorer.cs  CarDamage.cs  CarLights.cs  CarAudio.cs    CarVisuals.cs  CarFactory.cs  AI/    RacerAI.cs  RacingLine.cs  DifficultyProfile.cs    TrafficManager.cs  TrafficCar.cs  Race/    RaceManager.cs  Checkpoint.cs  LapCounter.cs    ResultsCalculator.cs  ReplayRecorder.cs  GhostPlayer.cs    Rules/ CircuitRace.cs  SprintRace.cs  TimeTrial.cs           DriftChallenge.cs  Elimination.cs  Environment/    TimeOfDayManager.cs  NightFactor.cs  WeatherManager.cs    WindowLightController.cs  StreetLamp.cs    TunnelTrigger.cs  ChunkStreamer.cs  Input/    InputManager.cs  TiltInput.cs  TouchControls.cs  ControllerInput.cs  UI/    UIManager.cs  UIThemeApplier.cs  UIAnimator.cs    Screens/ MainMenuScreen.cs  TrackSelectScreen.cs  GarageScreen.cs             RaceSetupScreen.cs  ResultsScreen.cs  SettingsScreen.cs  ShopScreen.cs    HUD/ Speedometer.cs  Tachometer.cs  NitroBar.cs         Minimap.cs  PositionLap.cs  Countdown.cs    Components/ AppButton.cs  StatBar.cs  CurrencyPill.cs                StarRating.cs  TierCard.cs  ToastView.cs  Data/    CarData.cs  TrackData.cs  EventData.cs  UpgradeData.cs    EconomyConfig.cs  TimeOfDayProfile.cs  GraphicsTierConfig.cs    UIThemeData.cs  UIMotionData.cs  Editor/    CarSetupWizard.cs  TrackValidator.cs    TierBuildPostprocessor.cs  NamingValidator.cs
-Assembly definitions and dependency rules
-Assemblies: CarGame.Core, .Services, .Vehicle, .AI, .Race, .Environment, .Input, .UI, .Data, .Editor and .Tests
-Core and Data sit at the bottom and depend on nothing
-Vehicle, AI, Race and Environment depend only on Core and Data
-UI depends on Core and Data, and nothing depends on UI
-Modules talk to each other through the EventBus, not direct references
-Backend files (TypeScript)
-Backend/functions/src/  index.ts  auth/createProfile.ts  purchases/verifyReceipt.ts  leaderboard/submitScore.ts  getLeaderboard.ts  replay/validateReplay.ts  events/liveEvents.ts  config/economy.json
-Data file formats
-ScriptableObjects for design data: cars, tracks, events, upgrades, themes and graphics tiers
-JSON for save files (encrypted, with a version number for migrations) and for remote config such as economy and live events
-4. Design System
-Principles
-Readable at speed: big numbers, few words, high contrast
-Thumb-first: key actions in the bottom third, large touch targets
-Premium automotive: dark surfaces, sharp angles, glowing accents
-Consistent: every screen is built from the same components and tokens
-Quiet while racing: the HUD shows only what the player needs
-Foundations
-Token
-Value
-Orientation
-Landscape for menus and racing
-Design artboard
-800 × 360 dp
-Unity Canvas Scaler
-Scale With Screen Size, reference 2400 × 1080, match height (1 dp = 3 canvas units)
-Spacing scale
-4, 8, 12, 16, 24, 32, 48 dp
-Screen margin
-16 dp plus the device safe area
-Shapes
-8 dp chamfered corners on cards, an 8° slant on primary buttons and tags, 4 dp radius on inputs
-Elevation
-Surface colors and accent glow, no drop shadows
-Borders
-1 dp border color, 2 dp accent for selected or focused
-Touch targets
-48 dp minimum, 56 dp for primary actions
-Icons
-24 dp grid, 2 dp stroke, sharp corners
-Component library
-Component
-Spec
-States
-Primary button
-56 dp high, slanted, accent fill, dark uppercase text
-Default, pressed, disabled, loading
-Secondary button
-48 dp high, accent outline and text
-Default, pressed, disabled
-Text button
-40 dp high, no fill
-Default, pressed
-Icon button
-48 × 48 dp with a 24 dp icon
-Default, pressed, disabled
-Car card
-240 × 150 dp, 3D render, name, 3 stat pips, price or Owned badge
-Selected, locked, owned
-Track card
-280 × 160 dp, image, name, length, stars, best time
-Locked, new, selected
-Stat bar
-8 dp high, accent fill, green preview segment for upgrades
-Base, preview
-Currency pill
-40 dp high, icon, amount, plus button
-Normal, gaining
-Toggle
-56 × 32 dp
-On, off, disabled
-Slider
-6 dp track, 24 dp thumb
-Default, dragging
-Segmented control
-4 segments, 48 dp high (graphics tiers)
-Selected, unselected
-Bottom navigation
-64 dp high, 4 items
-Active, inactive
-Modal
-Max 560 dp wide, Surface 2, chamfered, 60% dim behind
-Open, closing
-Toast
-56 dp high, top of screen, dismisses after 3 s
-Info, success, warning, error
-Chip
-40 dp high (time and weather picker)
-Selected, unselected
-Star rating
-3 stars at 32 dp
-Empty, filled
-Badge
-24 dp high (New, Owned, Locked)
-Fixed
-HUD rules
-Speed uses the largest text on screen, and the HUD shows at most 6 elements while racing.
-Opacity is 85%. Players can scale the HUD from 50% to 150% and hide any element.
-The HUD dims automatically at night, and respects safe areas and rounded corners.
-Workflow
-Design in Figma with the same tokens, and export sprites with 9-slice borders.
-Store tokens in a UIThemeData ScriptableObject.
-Build one StyleGuide scene that shows every component in every state, and review changes there before building screens.
-Accessibility
-Contrast of at least 4.5:1 for text and 3:1 for large text and UI shapes
-Never convey meaning with color alone
-Scalable text, a haptics toggle, a Reduce Motion setting and a left-handed layout
-5. Font System
-Font choices
-Role
-Font
-Weights
-License
-Display and numbers
-Chakra Petch
-Medium, SemiBold, Bold
-SIL Open Font License
-Body and UI text
-Barlow
-Regular, Medium, SemiBold
-SIL Open Font License
-Hindi fallback
-Noto Sans Devanagari
-Regular, Bold
-SIL Open Font License
-Arabic fallback
-Noto Sans Arabic
-Regular, Bold
-SIL Open Font License
-Japanese, Korean, Chinese fallback
-Noto Sans JP, KR and SC
-Regular, Bold
-SIL Open Font License
-All are free Google Fonts. Read the license file that comes with each download before shipping.
-Type scale
-Style
-Font
-Size
-Line height
-Use
-Display XL
-Chakra Petch Bold
-48 dp
-1.0
-HUD speed
-Display L
-Chakra Petch Bold
-36 dp
-1.0
-Countdown, big rewards
-H1
-Chakra Petch SemiBold
-28 dp
-1.1
-Screen titles
-H2
-Chakra Petch SemiBold
-22 dp
-1.15
-Section titles
-H3
-Chakra Petch Medium
-18 dp
-1.2
-Card titles
-Body L
-Barlow Medium
-16 dp
-1.3
-Key information
-Body
-Barlow Regular
-14 dp
-1.4
-Descriptions
-Caption
-Barlow Medium
-12 dp
-1.3
-Labels and hints
-Button
-Chakra Petch SemiBold
-14 dp, uppercase, +4% letter spacing
-1.0
-All buttons
-HUD numeric
-Chakra Petch Medium
-18–24 dp
-1.0
-Lap, timer, position
-Rules
-Minimum text size is 12 dp, and HUD text is 14 dp or larger.
-Two families only. Use uppercase only for buttons and short labels.
-Use TextMeshPro mspace for speed, timers and money so digits do not jitter.
-Keep body text to about 45–60 characters per line and 2 lines on cards.
-Translated text can be 30–40% longer, so leave room and use auto-size with a minimum size.
-Unity setup
-TextMeshPro SDF font assets, named like FA_ChakraPetch_Bold_SDF, stored in Art/UI/Fonts/ChakraPetch/.
-A static 1024 × 1024 atlas for ASCII and Latin-1, and dynamic atlases for other scripts to save memory.
-Fallback chain: Chakra Petch, then Barlow, then the Noto fonts for the player's language.
-6. Color System
-Core palette (dark theme)
-Token
-Hex
-Use
-bg.base
-#0B0E14
-Screen background
-surface.1
-#121722
-Cards and panels
-surface.2
-#1A2130
-Modals and raised panels
-surface.3
-#232C3F
-Inputs, bars and tracks
-border
-#2E394F
-Dividers and outlines
-text.primary
-#F2F5FA
-Main text
-text.secondary
-#A8B3C7
-Supporting text
-text.disabled
-#5C677D
-Disabled text and icons
-Accent by time of day
-Time
-Hex
-Mood
-Day
-#3DA5FF
-Sky blue
-Dusk and dawn
-#FF8A3D
-Warm orange
-Night
-#00E5FF
-Neon cyan
-Semantic and game colors
-Token
-Hex
-Use
-success
-#3DDC84
-Confirmations, gains
-warning
-#FFC933
-Cautions, cash, stars
-danger
-#FF4D5E
-Errors, wrong way, destructive actions
-gems
-#C084FF
-Premium currency
-nitro
-#7FD4FF to #2F6BFF
-Nitro bar and flames (gradient)
-1st, 2nd, 3rd
-#FFC933, #C9D1DC, #D98A4E
-Podium and position badges
-Contrast check (on bg.base, approximate)
-Color
-Ratio
-text.primary
-about 19:1
-text.secondary
-about 9:1
-Night accent
-about 12.5:1
-Dusk accent
-about 8:1
-Day accent
-about 7.5:1
-success
-about 11:1
-danger
-about 6:1
-Dark text (bg.base) on an accent fill gives the same ratios, so buttons stay readable.
-Rules
-Follow a 60/30/10 split: 60% background and surfaces, 30% text and neutrals, 10% accent.
-Use one accent at a time, only for the main action, the active state and key numbers.
-Use danger red only for warnings and destructive actions.
-Colorblind mode swaps success and danger for blue (#3DA5FF) and orange (#FF8A3D), and every status also gets an icon or number.
-Test with the Android developer option Simulate color space and iOS Color Filters.
-Time-of-day theming
-Menus use the accent for the selected time (Day, Dusk or Night).
-The race HUD blends the accent using the night factor and dusk factor from the time-of-day system, over about 2 seconds, so it never flips suddenly.
-Theme asset
-[CreateAssetMenu(menuName = "Game/UI Theme")]public class UIThemeData : ScriptableObject{    public Color bgBase, surface1, surface2, surface3, border;    public Color textPrimary, textSecondary, textDisabled;    public Color accentDay, accentDusk, accentNight;    public Color success, warning, danger, gems;    public Color GetAccent(float nightFactor, float duskFactor)    {        Color c = Color.Lerp(accentDay, accentNight, nightFactor);        return Color.Lerp(c, accentDusk, duskFactor);    }}
-7. UI Animations
-Principles
-Fast: most animations take 100–300 ms and never block input
-Purposeful: show state changes, guide attention and reward success
-Consistent: use the same motion tokens everywhere
-Optional: a Reduce Motion setting turns off non-essential motion
-Safe: nothing flashes more than 3 times per second
-Motion tokens
-Token
-Value
-Use
-instant
-100 ms
-Press feedback
-fast
-150 ms
-Small state changes
-base
-250 ms
-Elements, modals, toasts
-slow
-400 ms
-Screen transitions, stat bars
-hero
-600–800 ms
-Rewards and count-ups
-Easing
-Curve
-Unity equivalent
-Enter
-cubic-bezier(0.16, 1, 0.3, 1)
-OutExpo
-Exit
-cubic-bezier(0.7, 0, 0.84, 0)
-InExpo
-Move
-cubic-bezier(0.65, 0, 0.35, 1)
-InOutCubic
-Pop
-Spring with about 8% overshoot
-OutBack
-Animation catalog
-Element
-Animation
-Time
-Button press
-Scale to 0.96, glow brightens, haptic tick, springs back on release
-100 ms
-Screen transition
-New screen slides in 5% from the right and fades in, and the old one fades out
-250–400 ms
-Modal
-Scales from 0.92 to 1 and fades in, background dims to 60%
-200 ms
-Toast
-Slides down 24 dp, holds 3 s, fades out
-250 ms in, 200 ms out
-Tab or nav change
-Indicator slides, icon pops to 1.1
-200 ms
-List and card entrance
-Fade and slide 12 dp with a 40 ms stagger, up to 8 items
-250 ms
-Currency count-up
-Number rolls up with ease-out and the pill pulses
-600–800 ms
-Stat bar change
-Fill animates to the new value with a green flash on increase
-400 ms
-Upgrade purchase
-Car glow pulse and sparkle, stat bars update
-600 ms
-Star reveal
-Stars pop one by one with a small particle burst
-200 ms each
-Race countdown
-3, 2, 1 scale from 1.4 to 1 and fade, GO flashes once
-800 ms per step
-Speedometer
-Smoothed with a critically damped spring (smooth time 0.08 s), no tween
-Continuous
-Tachometer redline
-Color shifts to danger above 92% RPM, with a slow 2 Hz pulse
-Continuous
-Nitro activation
-FOV +8°, speed lines, blue edge vignette, radial blur on High and Max
-150 ms in, 400 ms out
-Position change
-Number flips with an arrow and a short green or red flash
-300 ms
-Lap complete
-Banner slides in from the left, holds 1.5 s, slides out right
-250 ms
-Wrong-way warning
-Danger banner flashes at 2 Hz until fixed
-Continuous
-Accent change at dusk or dawn
-Accent color blends smoothly
-2 s
-Garage turntable
-Drag with inertia, slow idle camera drift
-Continuous
-Paint swatch change
-Cross-fade with a small sparkle
-300 ms
-Daily reward claim
-Card flips and coins burst
-600 ms
-Loading
-Logo pulse, progress bar, tips fade every 4 s
-Continuous
-Implementation
-Use DOTween (the free version is enough) for code tweens, and the Animator or Timeline for longer sequences such as the results screen. Rive or Lottie are optional for animated icons.
-Animate only Transform, CanvasGroup alpha and Image color or fill. Avoid animating layout groups or text size because they trigger rebuilds.
-Keep every duration and curve in a UIMotionData ScriptableObject so you can tune them globally.
-Reduce Motion disables shakes, speed lines, parallax and flashes, and swaps slides for fades.
-UI particle caps: Low 20, Medium 50, High 100, Max 200. No full-screen blur on Low and Medium, use a simple dim instead.
-Menus must hold 60 FPS on the Low-tier reference device.
-8. Setup Order
-Create the repository, folder layout and Git LFS rules
-Create the assembly definitions
-Create the UIThemeData and UIMotionData assets with the tokens above
-Import the fonts, generate the TextMeshPro SDF assets and set the fallback chain
-Build the StyleGuide scene with every component in every state
-Implement the core animations: press, screen transition and count-up
-Build the real screens from components only
-Add the naming validator and the smoke tests to CI
+# No Limits: Project Structure and Design System (Web)
+
+Draft for the browser version.
+
+## 1. Language and stack decision
+
+**Decision: TypeScript for everything, Three.js for 3D, plain HTML and CSS for UI, Node scripts for tools.**
+
+| Layer                | Choice                          | Why                                             |
+| -------------------- | ------------------------------- | ----------------------------------------------- |
+| Game, UI, tools      | TypeScript (strict)             | One language, type safety, large ecosystem      |
+| 3D rendering         | Three.js                        | Mature, tree-shakeable, strong glTF support     |
+| Build and dev server | Vite                            | Fast start and rebuilds, light on a weak laptop |
+| UI                   | HTML and CSS with CSS variables | Crisp text, accessible, cheap to render         |
+| Audio                | Web Audio API                   | Built in, no download                           |
+| Tests                | Vitest                          | Same config as Vite, runs in Node               |
+| Asset tools          | Node scripts                    | No extra language to install                    |
+
+### Options considered
+
+| Option                 | Verdict                                                                    |
+| ---------------------- | -------------------------------------------------------------------------- |
+| Unity                  | Heavy editor and builds; the developer laptop cannot run it well. Dropped. |
+| Unreal                 | Even heavier. Not suited to a web target.                                  |
+| Godot with web export  | Light editor, but web builds are large and browser support has limits      |
+| Babylon.js             | Strong engine, but larger bundle and fewer small examples for this style   |
+| PlayCanvas             | Good, but editor is cloud-based and ties the project to its platform       |
+| Phaser                 | 2D only                                                                    |
+| **Three.js with Vite** | **Chosen: smallest download, full control, runs on any laptop**            |
+
+## 2. Repository structure
+
+```
+no-limits/
+  AGENTS.md
+  .github/workflows/
+    ci.yml                  typecheck, lint, test, build
+    deploy.yml              publish dist/ to the static host
+  Docs/
+    Full_Development_Plan.md
+    Project_Structure_and_Design_System.md
+    ASSET_LICENSES.md
+  Tools/
+    validateAssets.mjs      checks names, sizes, triangle counts
+    optimizeModels.mjs      meshopt and texture conversion helper
+  public/
+    manifest.webmanifest
+    icons/
+    fonts/                  woff2 subsets
+    assets/
+      cars/<car>/           model/ textures/ audio/ data/
+      tracks/<track>/       model/ textures/ audio/ data/
+      shared/               sky/ props/ sfx/ music/ ui/
+  src/
+    core/
+    data/
+    input/
+    vehicle/
+    ai/
+    race/
+    environment/
+    audio/
+    render/
+    services/
+    ui/
+    app/
+    main.ts
+  index.html
+  package.json
+  tsconfig.json
+  vite.config.ts
+  eslint.config.js
+  .prettierrc
+  .gitignore
+  .gitattributes
+```
+
+Every `cars/<car>/` and `tracks/<track>/` folder has the same sub-folders: `model`, `textures`, `audio`, `data`.
+
+## 3. Modules and key files
+
+| Module        | Key files                                                                                                                      | Purpose                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| `core`        | `EventBus.ts`, `GameLoop.ts`, `Rng.ts`, `Vec2.ts`, `Vec3.ts`, `math.ts`, `StateMachine.ts`                                     | Fixed-timestep loop, events, seeded random numbers, math types |
+| `data`        | `GameInfo.ts`, `CarData.ts`, `TrackData.ts`, `UpgradeData.ts`, `GraphicsTierConfig.ts`, `UiTheme.ts`, `MotionTokens.ts`        | Types and loaders for config                                   |
+| `input`       | `InputProvider.ts`, `InputState.ts`, `KeyboardInput.ts`, `GamepadInput.ts`, `TouchInput.ts`, `TiltInput.ts`, `InputManager.ts` | One input interface, many devices                              |
+| `vehicle`     | `VehicleState.ts`, `VehicleModel.ts`, `DriftScore.ts`, `Nitro.ts`                                                              | Pure, deterministic car simulation                             |
+| `ai`          | `RacingLine.ts`, `AiDriver.ts`, `TrafficSystem.ts`                                                                             | Opponents and traffic                                          |
+| `race`        | `RaceController.ts`, `Checkpoints.ts`, `LapTimer.ts`, `Standings.ts`, `Spline.ts`                                              | Race rules and track math                                      |
+| `environment` | `TimeOfDay.ts`, `WeatherState.ts`                                                                                              | Produces sun, sky and fog values (no rendering)                |
+| `audio`       | `AudioEngine.ts`, `EngineSound.ts`, `Mixer.ts`                                                                                 | Web Audio wrapper                                              |
+| `render`      | `Renderer.ts`, `CameraRig.ts`, `CarView.ts`, `TrackView.ts`, `SkyView.ts`, `TierApplier.ts`, `AssetLoader.ts`                  | Three.js scene, reads simulation state                         |
+| `services`    | `SaveService.ts`, `SettingsService.ts`, `GraphicsService.ts`, `AnalyticsService.ts`                                            | Persistence and settings                                       |
+| `ui`          | `ScreenManager.ts`, `screens/`, `components/`, `styles/`                                                                       | DOM screens and components                                     |
+| `app`         | `App.ts`, `bootstrap.ts`                                                                                                       | Creates and connects everything                                |
+
+### Dependency rules
+
+- `core` and `data` import nothing from other modules.
+- `input`, `vehicle`, `ai`, `race`, `environment` and `audio` import only `core` and `data`.
+- `render` imports `core` and `data`. The simulation never imports `render`.
+- `services` imports `core` and `data`.
+- `ui` imports `core`, `data` and `services`. Nothing imports `ui`.
+- `app` is the only place that wires modules together.
+- Simulation modules (`core`, `vehicle`, `ai`, `race`) never import `three`.
+
+## 4. Coding rules
+
+- TypeScript `strict`, no `any`, ES modules, named exports only.
+- File name equals main export name.
+- PascalCase types and classes, camelCase functions and fields, UPPER_SNAKE_CASE constants.
+- No allocations in the game loop; reuse objects.
+- Fixed 60 Hz simulation; render interpolates.
+- Deterministic simulation: seeded `Rng`, no `Math.random()` or `Date.now()` inside it.
+- Communication through a typed `EventBus`.
+- Async asset loading with progress. Dispose Three.js resources on unload.
+
+## 5. Data model
+
+Starting shapes (fields can grow with the plan):
+
+```ts
+export interface CarData {
+  id: string; // "kaze"
+  displayName: string;
+  mass: number; // kg
+  topSpeed: number; // m/s
+  powerCurve: readonly number[]; // normalized torque by speed bucket
+  drag: number;
+  grip: number;
+  driftGripFactor: number; // grip multiplier while drifting
+  maxSteerAngle: number; // radians
+  steerSpeedFalloff: number;
+  nitroStrength: number;
+  nitroDuration: number; // seconds
+  nitroCooldown: number; // seconds
+  models: { low: string; medium: string; high: string };
+  paints: readonly string[]; // hex colors
+}
+
+export interface TrackData {
+  id: string;
+  displayName: string;
+  lengthMeters: number;
+  laps: number;
+  controlPoints: readonly { x: number; y: number; z: number; width: number }[];
+  checkpointCount: number;
+  scenery: string; // GLB path
+  timeOfDayStart: number; // 0 to 24
+}
+
+export interface GraphicsTierConfig {
+  id: 'low' | 'medium' | 'high';
+  pixelRatioCap: number;
+  shadows: 'blob' | 'map' | 'softMap';
+  postProcessing: readonly string[];
+  drawDistance: number;
+  maxTraffic: number;
+  maxOpponents: number;
+  particleScale: number; // 0 to 1
+}
+
+export interface InputState {
+  steer: number; // -1 to 1
+  throttle: number; // 0 to 1
+  brake: number; // 0 to 1
+  handbrake: boolean;
+  nitro: boolean;
+  pause: boolean;
+}
+```
+
+`GameInfo` holds `displayName` ("No Limits"), `shortName`, `version` and the app id in one place; all UI and manifest text read from it.
+
+## 6. Rendering architecture
+
+- The simulation produces a `VehicleState` per car each fixed step.
+- `render` keeps the previous and current state and interpolates by the leftover time fraction, so motion is smooth at any display rate.
+- One `Renderer` owns the Three.js `WebGLRenderer`, scene and camera rig.
+- `TierApplier` changes pixel ratio, shadows, post-processing and draw distance from a `GraphicsTierConfig`. Use shader defines or material variants instead of separate shader files per tier.
+- The road mesh is generated from the track spline; scenery comes from a GLB, with repeated props drawn through `InstancedMesh`.
+- Static scenery is merged where possible to cut draw calls.
+
+## 7. UI architecture
+
+- The canvas fills the page. A DOM overlay sits on top for HUD, menus and dialogs.
+- `ScreenManager` shows one screen at a time and listens to the game state machine.
+- Screens are built only from shared components (section 10). Build the `#styleguide` page first and check every component there.
+
+### Screens
+
+| Screen       | Purpose                                            |
+| ------------ | -------------------------------------------------- |
+| Boot         | Logo, asset check, first-gesture prompt for audio  |
+| Main Menu    | Play, Garage, Settings                             |
+| Track Select | Track cards with best time and stars               |
+| Garage       | Car view, stats, paint, upgrades                   |
+| Loading      | Progress bar and a tip                             |
+| HUD          | Speed, lap, position, nitro, minimap, drift score  |
+| Pause        | Resume, Restart, Settings, Quit                    |
+| Results      | Position, times, rewards, Next                     |
+| Settings     | Graphics, audio, controls, language, accessibility |
+| Rotate Hint  | Phones in portrait                                 |
+
+## 8. Design tokens
+
+All values live in `src/ui/styles/tokens.css` as CSS variables, with a typed copy in `UiTheme.ts` for code that needs them.
+
+```css
+:root {
+  /* colors (dark theme) */
+  --bg-base: #0b0e14;
+  --surface-1: #121722;
+  --surface-2: #1a2130;
+  --surface-3: #232c3f;
+  --border: #2e394f;
+  --text-primary: #f2f5fa;
+  --text-secondary: #a8b3c7;
+  --text-disabled: #5c677d;
+  --accent: #3da5ff; /* day; dusk #FF8A3D; night #00E5FF */
+  --success: #3ddc84;
+  --warning: #ffc933;
+  --danger: #ff4d5e;
+  --gems: #c084ff;
+
+  /* spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* radius and elevation */
+  --radius-s: 6px;
+  --radius-m: 12px;
+  --radius-l: 20px;
+  --elev-1: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --elev-2: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  /* type scale */
+  --fs-12: 12px;
+  --fs-14: 14px;
+  --fs-16: 16px;
+  --fs-20: 20px;
+  --fs-24: 24px;
+  --fs-32: 32px;
+  --fs-48: 48px;
+
+  /* motion */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+```
+
+- One accent at a time. The accent changes with the time of day.
+- Text contrast at least 4.5:1. Never use color alone to carry meaning; pair it with an icon or label.
+- Safe-area padding uses `env(safe-area-inset-*)` plus a 16 px screen margin.
+
+## 9. Fonts
+
+- **Chakra Petch** for display text and numbers, **Barlow** for body and UI.
+- Self-host `woff2` subsets in `public/fonts/` with `font-display: swap`. Both are open-licensed; log them in `ASSET_LICENSES.md`.
+- Fallback stacks: `system-ui, sans-serif`. Load Noto Sans for Devanagari, Arabic, JP, KR and SC only when the chosen language needs it.
+- Minimum text size 12 px. HUD text 14 px or larger.
+- Speed, timers and money use `font-variant-numeric: tabular-nums` so digits do not jump.
+
+## 10. Component library
+
+Build each once, with every state, on the `#styleguide` page.
+
+| Component                                                                  | States                                     |
+| -------------------------------------------------------------------------- | ------------------------------------------ |
+| Button (primary, secondary, ghost, icon)                                   | default, hover, focus, pressed, disabled   |
+| Card (car card, track card)                                                | default, selected, locked                  |
+| Stat bar                                                                   | normal, upgraded                           |
+| Toggle and slider                                                          | default, focus, disabled                   |
+| Dropdown and tabs                                                          | default, open, focus                       |
+| Modal and toast                                                            | enter, idle, exit                          |
+| Progress bar                                                               | determinate, indeterminate                 |
+| HUD widgets (speedometer, nitro gauge, lap badge, position badge, minimap) | normal, warning                            |
+| Focus ring                                                                 | visible on keyboard and gamepad navigation |
+
+Rules:
+
+- Touch targets at least 48 px, primary actions 56 px.
+- Menus work with keyboard arrows and Enter, gamepad d-pad and A, mouse hover and click, and touch.
+
+## 11. Animation and motion
+
+- Animate only `transform`, `opacity` and color. Never animate layout properties, `box-shadow` size or text size.
+- Durations and easings come from the motion tokens. `MotionTokens.ts` mirrors them for scripted animation.
+- Respect `prefers-reduced-motion` and an in-game Reduce Motion setting: replace movement with simple fades.
+- Nothing flashes more than 3 times per second.
+- Screen transitions use a short fade plus a small slide. HUD number changes do not animate layout.
+
+## 12. Responsive layout and input
+
+- Landscape first. Base artboard 800 x 360 CSS px; the layout stretches with flex and grid between 4:3 and 21:9.
+- Phones in portrait show the Rotate Hint screen.
+- HUD anchors to screen corners and respects safe areas.
+- Mobile shows touch controls; desktop hides them. The player can switch control scheme in Settings.
+- Show the correct button prompts (keyboard, Xbox or PlayStation style) for the last-used device.
+
+## 13. Accessibility
+
+- Text contrast at least 4.5:1.
+- All interactive elements are reachable by keyboard and have visible focus.
+- Buttons and toggles have labels for screen readers; HUD values use `aria-live` sparingly.
+- Options: Reduce Motion, larger HUD text, color-blind safe palette for track markers, steering sensitivity, and speed units.
+- No flashing content above the 3 flashes per second limit.
+
+## 14. Asset specifications
+
+| Asset         | Spec                                                             |
+| ------------- | ---------------------------------------------------------------- |
+| Car model     | GLB, meshopt compressed. Triangles: Low 8k, Medium 20k, High 45k |
+| Track scenery | GLB, instanced props, merged static geometry                     |
+| Textures      | KTX2 where possible, otherwise WebP. Max 2048, Low tier max 1024 |
+| Audio         | Ogg Vorbis, mono for effects, stereo for music                   |
+| Icons         | SVG, single color, 24 px grid                                    |
+| Fonts         | woff2 subsets                                                    |
+
+`Tools/validateAssets.mjs` checks these limits and the naming rules in AGENTS.md.
+
+## 15. Tooling and scripts
+
+`package.json` scripts:
+
+| Script            | Purpose                                    |
+| ----------------- | ------------------------------------------ |
+| `dev`             | Start the Vite dev server                  |
+| `build`           | Type check and build to `dist/`            |
+| `preview`         | Serve the built game locally               |
+| `typecheck`       | `tsc --noEmit`                             |
+| `lint`            | ESLint, including the import-boundary rule |
+| `test`            | Vitest run                                 |
+| `validate:assets` | Run the asset validator                    |
+
+Setup Order and the First 4 Weeks plan are in the Development Plan, section 17.
