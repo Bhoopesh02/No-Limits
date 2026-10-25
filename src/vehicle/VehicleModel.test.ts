@@ -1,0 +1,255 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { CarData, DEFAULT_CAR_KAZE } from '../data/CarData';
+import { createInputState, InputState } from '../data/InputState';
+import { VehicleModel } from './VehicleModel';
+import { createVehicleState, VehicleState } from './VehicleState';
+
+describe('VehicleModel', () => {
+  let state: VehicleState;
+  let input: InputState;
+  const carData: CarData = DEFAULT_CAR_KAZE;
+  const dt = 1 / 60; // 60 Hz fixed timestep
+
+  beforeEach(() => {
+    state = createVehicleState();
+    input = createInputState();
+  });
+
+  it('accelerates from 0 to 100 km/h within 10% of the 4.1s target and reaches top speed', () => {
+    input.throttle = 1.0;
+    const target100Kmh = 100 / 3.6; // ~27.778 m/s
+    let timeTo100 = 0;
+
+    // Simulate for 60 seconds
+    for (let i = 0; i < 60 * 60; i++) {
+      VehicleModel.step(state, input, carData, dt);
+      if (state.forwardSpeed >= target100Kmh && timeTo100 === 0) {
+        timeTo100 = (i + 1) * dt;
+      }
+      expect(state.forwardSpeed).toBeLessThanOrEqual(carData.topSpeed + 0.001);
+    }
+
+    // 4.1s target with 10% tolerance (3.69s to 4.51s)
+    expect(timeTo100).toBeGreaterThanOrEqual(4.1 * 0.9);
+    expect(timeTo100).toBeLessThanOrEqual(4.1 * 1.1);
+
+    // Reaches within 0.1% of top speed (290 km/h / 3.6 ≈ 80.56 m/s) and never exceeds without nitro
+    expect(state.forwardSpeed).toBeCloseTo(carData.topSpeed, 1);
+    expect(state.forwardSpeed).toBeLessThanOrEqual(carData.topSpeed);
+  });
+
+  it('brakes to exactly 0 and never reverses', () => {
+    state.forwardSpeed = 50.0;
+    state.speed = 50.0;
+    input.brake = 1.0;
+
+    for (let i = 0; i < 10 * 60; i++) {
+      VehicleModel.step(state, input, carData, dt);
+      expect(state.forwardSpeed).toBeGreaterThanOrEqual(0);
+      expect(state.speed).toBeGreaterThanOrEqual(0);
+    }
+
+    expect(state.forwardSpeed).toBe(0);
+    expect(state.speed).toBe(0);
+  });
+
+  it('shrinks steering angle with speed, turning tighter at low speed than high speed', () => {
+    // Low speed steer test
+    const lowSpeed = createVehicleState(0, 0, 0, 0, 10.0);
+    const steerIn = createInputState();
+    steerIn.steer = 1.0;
+
+    // Run for 1.5 seconds so steering rack reaches target
+    for (let i = 0; i < 90; i++) {
+      VehicleModel.step(lowSpeed, steerIn, carData, dt);
+    }
+    const lowSpeedSteerAngle = Math.abs(lowSpeed.steerAngle);
+
+    // High speed steer test
+    const highSpeed = createVehicleState(0, 0, 0, 0, 75.0);
+    for (let i = 0; i < 90; i++) {
+      VehicleModel.step(highSpeed, steerIn, carData, dt);
+    }
+    const highSpeedSteerAngle = Math.abs(highSpeed.steerAngle);
+
+    expect(highSpeedSteerAngle).toBeLessThan(lowSpeedSteerAngle);
+  });
+
+  it('enters drift with handbrake plus steering at speed, lateral speed becomes non-zero then decays after release', () => {
+    state.forwardSpeed = 35.0;
+    state.speed = 35.0;
+    input.throttle = 0.5;
+    input.steer = 1.0;
+    input.handbrake = true;
+
+    // Apply handbrake + steer for 0.5s
+    for (let i = 0; i < 30; i++) {
+      VehicleModel.step(state, input, carData, dt);
+    }
+
+    expect(state.isDrifting).toBe(true);
+    expect(Math.abs(state.lateralSpeed)).toBeGreaterThan(carData.driftEntrySlip);
+
+    // Release handbrake and steering to straighten out
+    input.handbrake = false;
+    input.steer = 0;
+    input.throttle = 1.0;
+
+    for (let i = 0; i < 200; i++) {
+      VehicleModel.step(state, input, carData, dt);
+    }
+
+    // Lateral velocity must decay to zero
+    expect(state.lateralSpeed).toBe(0);
+    expect(state.isDrifting).toBe(false);
+  });
+
+  it('accumulates drift score only while drifting, multiplier rises over time and resets when drift ends', () => {
+    state.forwardSpeed = 40.0;
+    // Steer right (0.8) kicks rear out leftwards (-lateralSpeed)
+    state.lateralSpeed = -(carData.driftEntrySlip + 1.0);
+    state.speed = Math.hypot(state.forwardSpeed, state.lateralSpeed);
+
+    input.throttle = 1.0;
+    input.steer = 0.8;
+    input.handbrake = true; // sustain drift
+
+    let prevScore = 0;
+    // Step 2 seconds in drift
+    for (let i = 0; i < 120; i++) {
+      VehicleModel.step(state, input, carData, dt);
+      expect(state.driftScore).toBeGreaterThanOrEqual(prevScore);
+      prevScore = state.driftScore;
+    }
+
+    expect(state.isDrifting).toBe(true);
+    expect(state.driftMultiplier).toBeGreaterThanOrEqual(2.0);
+    expect(state.driftScore).toBeGreaterThan(0);
+
+    // Release handbrake and steer to exit drift
+    input.handbrake = false;
+    input.steer = 0;
+    input.throttle = 1.0;
+
+    for (let i = 0; i < 240; i++) {
+      VehicleModel.step(state, input, carData, dt);
+    }
+
+    expect(state.isDrifting).toBe(false);
+    expect(state.driftMultiplier).toBe(1.0);
+    expect(state.driftScore).toBe(0);
+  });
+
+  it('nitro fills during drift, cannot fire when empty or on cooldown, boosts above normal top speed, and stays in [0, 1]', () => {
+    state.forwardSpeed = 30.0;
+    state.speed = 30.0;
+    state.nitroAmount = 0.0; // empty
+    state.nitroActiveTime = 0;
+    state.nitroCooldownTimer = 0;
+
+    // 1. Cannot fire when empty
+    input.nitro = true;
+    VehicleModel.step(state, input, carData, dt);
+    expect(state.nitroActiveTime).toBe(0);
+
+    // 2. Fills while drifting
+    input.nitro = false;
+    input.handbrake = true;
+    input.steer = 1.0;
+    for (let i = 0; i < 60; i++) {
+      VehicleModel.step(state, input, carData, dt);
+    }
+    expect(state.nitroAmount).toBeGreaterThan(0);
+    expect(state.nitroAmount).toBeLessThanOrEqual(1.0);
+
+    // Fill to 1.0
+    state.nitroAmount = 1.0;
+    state.forwardSpeed = carData.topSpeed; // already at top speed
+    state.lateralSpeed = 0;
+    input.handbrake = false;
+    input.steer = 0;
+    input.throttle = 1.0;
+    input.nitro = true;
+
+    // Fire nitro
+    VehicleModel.step(state, input, carData, dt);
+    expect(state.nitroActiveTime).toBeGreaterThan(0);
+
+    // Advance while active: must boost beyond normal top speed
+    for (let i = 0; i < 60; i++) {
+      VehicleModel.step(state, input, carData, dt);
+    }
+    expect(state.forwardSpeed).toBeGreaterThan(carData.topSpeed);
+
+    // Run until nitro fully expires
+    for (let i = 0; i < 300; i++) {
+      VehicleModel.step(state, input, carData, dt);
+    }
+    expect(state.nitroActiveTime).toBe(0);
+    expect(state.nitroCooldownTimer).toBeGreaterThan(0);
+
+    // During cooldown, cannot fire even if tank somehow has fuel
+    state.nitroAmount = 1.0;
+    input.nitro = true;
+    VehicleModel.step(state, input, carData, dt);
+    expect(state.nitroActiveTime).toBe(0);
+
+    // Speed returns to normal top speed after boost ends
+    for (let i = 0; i < 300; i++) {
+      input.nitro = false;
+      VehicleModel.step(state, input, carData, dt);
+    }
+    expect(state.forwardSpeed).toBeLessThanOrEqual(carData.topSpeed + 0.01);
+  });
+
+  it('guarantees bit-identical determinism over 1000 steps with identical inputs', () => {
+    const stateA = createVehicleState();
+    const stateB = createVehicleState();
+
+    const sequence: InputState[] = [
+      { steer: 0, throttle: 1, brake: 0, handbrake: false, nitro: false, pause: false },
+      { steer: 0.6, throttle: 1, brake: 0, handbrake: true, nitro: false, pause: false },
+      { steer: -0.4, throttle: 1, brake: 0, handbrake: false, nitro: true, pause: false },
+      { steer: 0, throttle: 0, brake: 1, handbrake: false, nitro: false, pause: false },
+    ];
+
+    for (let i = 0; i < 1000; i++) {
+      const stepInput = sequence[Math.floor(i / 250)];
+      VehicleModel.step(stateA, stepInput, carData, dt);
+      VehicleModel.step(stateB, stepInput, carData, dt);
+    }
+
+    expect(stateA.x).toBe(stateB.x);
+    expect(stateA.y).toBe(stateB.y);
+    expect(stateA.z).toBe(stateB.z);
+    expect(stateA.heading).toBe(stateB.heading);
+    expect(stateA.forwardSpeed).toBe(stateB.forwardSpeed);
+    expect(stateA.lateralSpeed).toBe(stateB.lateralSpeed);
+    expect(stateA.speed).toBe(stateB.speed);
+    expect(stateA.steerAngle).toBe(stateB.steerAngle);
+    expect(stateA.nitroAmount).toBe(stateB.nitroAmount);
+    expect(stateA.driftScore).toBe(stateB.driftScore);
+  });
+
+  it('maintains stability under extreme inputs (full steer at top speed for 10 s) with no NaN or Infinity', () => {
+    state.forwardSpeed = carData.topSpeed;
+    input.throttle = 1.0;
+    input.steer = 1.0;
+    input.handbrake = true;
+    input.nitro = true;
+
+    // Run for 10 seconds (600 steps)
+    for (let i = 0; i < 600; i++) {
+      VehicleModel.step(state, input, carData, dt);
+
+      expect(Number.isFinite(state.x)).toBe(true);
+      expect(Number.isFinite(state.y)).toBe(true);
+      expect(Number.isFinite(state.z)).toBe(true);
+      expect(Number.isFinite(state.heading)).toBe(true);
+      expect(Number.isFinite(state.speed)).toBe(true);
+      expect(Number.isFinite(state.forwardSpeed)).toBe(true);
+      expect(Number.isFinite(state.lateralSpeed)).toBe(true);
+      expect(Number.isFinite(state.steerAngle)).toBe(true);
+    }
+  });
+});

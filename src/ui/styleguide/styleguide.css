@@ -136,8 +136,10 @@
 /* Grid helper */
 .sg-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: var(--space-4);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Swatches */
@@ -245,4 +247,204 @@
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
+}
+
+/* ==========================================================================
+   HUD PREVIEW & SIMULATOR
+   ========================================================================== */
+
+.sg-hud-sim-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  align-items: flex-end;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.sg-hud-sim-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 140px;
+  flex: 1 1 200px;
+  box-sizing: border-box;
+}
+
+.sg-hud-frames-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: var(--space-5);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sg-hud-frame-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sg-hud-frame-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-display);
+  font-size: var(--fs-14);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.sg-hud-frame-badge {
+  font-size: var(--fs-12);
+  color: var(--accent);
+  background-color: rgba(61, 165, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: var(--radius-s);
+}
+
+.sg-hud-frame {
+  position: relative;
+  width: 100%;
+  background:
+    radial-gradient(ellipse at 50% 120%, rgba(61, 165, 255, 0.12) 0%, transparent 70%),
+    linear-gradient(180deg, #090c12 0%, #111723 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--elev-1);
+  overflow: hidden;
+  container-type: inline-size;
+  box-sizing: border-box;
+}
+
+/* Simulated race track horizon lines for visual immersion */
+.sg-hud-frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to top, rgba(61, 165, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to right, rgba(61, 165, 255, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.sg-hud-frame--4-3 {
+  aspect-ratio: 4 / 3;
+}
+
+.sg-hud-frame--16-9 {
+  aspect-ratio: 16 / 9;
+}
+
+.sg-hud-frame--21-9 {
+  aspect-ratio: 21 / 9;
+}
+
+.sg-hud-frame--phone {
+  aspect-ratio: 2 / 1;
+}
+
+/* Container Queries for graceful HUD scaling inside frames */
+@container (max-width: 600px) {
+  .sg-hud-frame .nl-hud-speedometer__value {
+    font-size: clamp(28px, 9cqw, 44px);
+  }
+
+  .sg-hud-frame .nl-hud-nitro {
+    width: clamp(110px, 30cqw, 160px);
+  }
+
+  .sg-hud-frame .nl-hud-minimap {
+    width: clamp(68px, 18cqw, 95px);
+    height: clamp(68px, 18cqw, 95px);
+  }
+
+  .sg-hud-frame .nl-hud-badge {
+    padding: 2px clamp(4px, 1.5cqw, 8px);
+  }
+
+  .sg-hud-frame .nl-hud-badge__value {
+    font-size: clamp(14px, 4cqw, 18px);
+  }
+
+  .sg-hud-frame .hud-root {
+    padding: clamp(6px, 2cqw, 12px);
+  }
+}
+
+@container (max-width: 380px) {
+  .sg-hud-frame .nl-hud-speedometer__value {
+    font-size: clamp(22px, 8cqw, 30px);
+  }
+
+  .sg-hud-frame .nl-hud-speedometer__unit {
+    font-size: 11px;
+  }
+
+  .sg-hud-frame .nl-hud-nitro {
+    width: clamp(90px, 28cqw, 120px);
+  }
+
+  .sg-hud-frame .nl-hud-minimap {
+    width: 60px;
+    height: 60px;
+  }
+}
+
+/* ==========================================================================
+   Small screen / 320px viewport safety (zero horizontal scroll)
+   ========================================================================== */
+@media (max-width: 480px) {
+  .sg-page {
+    padding: max(var(--space-4), env(safe-area-inset-top, 0px))
+      max(var(--space-3), env(safe-area-inset-right, 0px))
+      max(var(--space-5), env(safe-area-inset-bottom, 0px))
+      max(var(--space-3), env(safe-area-inset-left, 0px));
+    gap: var(--space-4);
+    overflow-x: hidden;
+  }
+
+  .sg-header,
+  .sg-section {
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .sg-header__title {
+    font-size: var(--fs-24);
+  }
+
+  .sg-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sg-hud-frames-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sg-hud-sim-controls {
+    padding: var(--space-3);
+    gap: var(--space-3);
+  }
+
+  .sg-hud-sim-item {
+    min-width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .sg-spacing-row {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .sg-spacing-label {
+    width: 100%;
+  }
 }

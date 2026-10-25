@@ -1,32 +1,42 @@
 import './ui/styles/fonts.css';
 import './ui/styles/tokens.css';
 import './ui/styles/base.css';
+import './ui/styles/components.css';
+import './ui/styles/hud.css';
+import { App } from './app/App';
 import { GameInfo } from './data/GameInfo';
 
 // Set document title from single source of truth
 document.title = GameInfo.displayName;
 
+let activeApp: App | null = null;
+
 function renderNormalApp(): void {
   document.documentElement.classList.remove('is-styleguide');
-  const uiRoot = document.getElementById('ui-root');
-  if (uiRoot) {
-    uiRoot.innerHTML = '';
-    const proofElement = document.createElement('div');
-    proofElement.style.cssText =
-      'font-size: var(--fs-14); color: var(--text-secondary); background: var(--surface-1); padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-s); display: inline-block; font-variant-numeric: tabular-nums;';
 
-    const updateProof = (): void => {
-      proofElement.textContent = `${GameInfo.displayName} — ${window.innerWidth}×${window.innerHeight}`;
-    };
+  if (activeApp) {
+    activeApp.dispose();
+    activeApp = null;
+  }
 
-    updateProof();
-    window.addEventListener('resize', updateProof);
-    uiRoot.appendChild(proofElement);
+  try {
+    activeApp = new App();
+    activeApp.start();
+  } catch (error) {
+    console.error('Failed to initialize app:', error);
   }
 }
 
 function handleRoute(): void {
   if (window.location.hash === '#styleguide') {
+    if (activeApp) {
+      activeApp.dispose();
+      activeApp = null;
+    }
+    const gameRoot = document.getElementById('game-root');
+    if (gameRoot) {
+      gameRoot.innerHTML = '';
+    }
     import('./ui/styleguide/Styleguide').then(({ initStyleguide }) => {
       initStyleguide();
     });
