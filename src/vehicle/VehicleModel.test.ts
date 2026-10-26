@@ -38,19 +38,130 @@ describe('VehicleModel', () => {
     expect(state.forwardSpeed).toBeLessThanOrEqual(carData.topSpeed);
   });
 
-  it('brakes to exactly 0 and never reverses', () => {
+  it('stops the car with brake from speed and does not reverse until speed <= 1 m/s', () => {
     state.forwardSpeed = 50.0;
     state.speed = 50.0;
     input.brake = 1.0;
 
-    for (let i = 0; i < 10 * 60; i++) {
+    // While speed > 1 m/s, car must decelerate and not reverse
+    while (state.forwardSpeed > 1.0) {
       VehicleModel.step(state, input, carData, dt);
-      expect(state.forwardSpeed).toBeGreaterThanOrEqual(0);
-      expect(state.speed).toBeGreaterThanOrEqual(0);
+      if (state.forwardSpeed > 1.0) {
+        expect(state.forwardSpeed).toBeGreaterThan(0);
+        expect(state.isReversing).toBe(false);
+      }
     }
 
-    expect(state.forwardSpeed).toBe(0);
-    expect(state.speed).toBe(0);
+    // Now speed <= 1 m/s. Continuing to hold brake must now accelerate backward in reverse
+    expect(state.forwardSpeed).toBeLessThanOrEqual(1.0);
+
+    for (let i = 0; i < 60; i++) {
+      VehicleModel.step(state, input, carData, dt);
+    }
+
+    expect(state.forwardSpeed).toBeLessThan(0);
+    expect(state.isReversing).toBe(true);
+  });
+
+  it('reaches reverseTopSpeed and never exceeds it when holding brake at standstill', () => {
+    state.forwardSpeed = 0;
+    state.speed = 0;
+    input.brake = 1.0;
+    input.throttle = 0;
+
+    // Hold brake at standstill for 5 seconds (300 steps)
+    for (let i = 0; i < 300; i++) {
+      VehicleModel.step(state, input, carData, dt);
+      expect(state.forwardSpeed).toBeLessThanOrEqual(0);
+      expect(state.forwardSpeed).toBeGreaterThanOrEqual(-carData.reverseTopSpeed);
+      expect(state.isReversing).toBe(true);
+    }
+
+    // Must reach reverse top speed (12 m/s) and never exceed it
+    expect(state.forwardSpeed).toBeCloseTo(-carData.reverseTopSpeed, 1);
+    expect(Math.abs(state.forwardSpeed)).toBeLessThanOrEqual(carData.reverseTopSpeed);
+  });
+
+  it('decelerates with throttle while reversing, crosses zero, then goes forward', () => {
+    // Start car moving backward at reverse top speed
+    state.forwardSpeed = -carData.reverseTopSpeed;
+    state.speed = -carData.reverseTopSpeed;
+    state.isReversing = true;
+
+    input.throttle = 1.0;
+    input.brake = 0;
+
+    let crossedZero = false;
+    let timeToCrossZero = 0;
+
+    // Step for 4 seconds
+    for (let i = 0; i < 240; i++) {
+      const prevSpeed = state.forwardSpeed;
+      VehicleModel.step(state, input, carData, dt);
+
+      // Must decelerate towards zero (forwardSpeed increases)
+      if (!crossedZero) {
+        expect(state.forwardSpeed).toBeGreaterThan(prevSpeed);
+        if (state.forwardSpeed >= 0) {
+          crossedZero = true;
+          timeToCrossZero = (i + 1) * dt;
+        }
+      }
+    }
+
+    expect(crossedZero).toBe(true);
+    expect(timeToCrossZero).toBeGreaterThan(0);
+    expect(state.forwardSpeed).toBeGreaterThan(10.0);
+    expect(state.isReversing).toBe(false);
+  });
+
+  it('inverts steering direction correctly when in reverse', () => {
+    // 1. Moving forward: steer right (steer = 1.0)
+    const forwardCar = createVehicleState(0, 0, 0, 0, 20.0);
+    const steerRightInput = createInputState();
+    steerRightInput.steer = 1.0;
+    steerRightInput.throttle = 0.5;
+
+    for (let i = 0; i < 30; i++) {
+      VehicleModel.step(forwardCar, steerRightInput, carData, dt);
+    }
+    const forwardHeadingDelta = forwardCar.heading;
+
+    // 2. Moving backward (reverse): steer right (steer = 1.0)
+    const reverseCar = createVehicleState(0, 0, 0, 0, -carData.reverseTopSpeed);
+    const reverseSteerInput = createInputState();
+    reverseSteerInput.steer = 1.0;
+    reverseSteerInput.brake = 1.0; // keep in reverse
+
+    for (let i = 0; i < 30; i++) {
+      VehicleModel.step(reverseCar, reverseSteerInput, carData, dt);
+    }
+    const reverseHeadingDelta = reverseCar.heading;
+
+    // Turning steering wheel right when reversing turns chassis in the opposite direction
+    expect(Math.sign(reverseHeadingDelta)).toBe(-Math.sign(forwardHeadingDelta));
+  });
+
+  it('blocks nitro activation and keeps drift score unchanged while reversing', () => {
+    state.forwardSpeed = -carData.reverseTopSpeed;
+    state.speed = -carData.reverseTopSpeed;
+    state.isReversing = true;
+    state.nitroAmount = 1.0;
+    state.lateralSpeed = 5.0; // high lateral slip
+    state.driftScore = 0;
+
+    input.nitro = true;
+    input.steer = 1.0;
+    input.brake = 1.0;
+
+    for (let i = 0; i < 60; i++) {
+      VehicleModel.step(state, input, carData, dt);
+      // Nitro must remain inactive
+      expect(state.nitroActiveTime).toBe(0);
+      // Drift score must remain 0
+      expect(state.driftScore).toBe(0);
+      expect(state.isDrifting).toBe(false);
+    }
   });
 
   it('shrinks steering angle with speed, turning tighter at low speed than high speed', () => {
@@ -61,6 +172,7 @@ describe('VehicleModel', () => {
 
     // Run for 1.5 seconds so steering rack reaches target
     for (let i = 0; i < 90; i++) {
+      lowSpeed.forwardSpeed = 10.0;
       VehicleModel.step(lowSpeed, steerIn, carData, dt);
     }
     const lowSpeedSteerAngle = Math.abs(lowSpeed.steerAngle);
@@ -68,6 +180,7 @@ describe('VehicleModel', () => {
     // High speed steer test
     const highSpeed = createVehicleState(0, 0, 0, 0, 75.0);
     for (let i = 0; i < 90; i++) {
+      highSpeed.forwardSpeed = 75.0;
       VehicleModel.step(highSpeed, steerIn, carData, dt);
     }
     const highSpeedSteerAngle = Math.abs(highSpeed.steerAngle);
@@ -229,6 +342,7 @@ describe('VehicleModel', () => {
     expect(stateA.steerAngle).toBe(stateB.steerAngle);
     expect(stateA.nitroAmount).toBe(stateB.nitroAmount);
     expect(stateA.driftScore).toBe(stateB.driftScore);
+    expect(stateA.isReversing).toBe(stateB.isReversing);
   });
 
   it('maintains stability under extreme inputs (full steer at top speed for 10 s) with no NaN or Infinity', () => {
@@ -251,5 +365,137 @@ describe('VehicleModel', () => {
       expect(Number.isFinite(state.lateralSpeed)).toBe(true);
       expect(Number.isFinite(state.steerAngle)).toBe(true);
     }
+  });
+
+  it('turns heading in the left direction when pressing left at speed, and opposite when pressing right', () => {
+    // Car moves forward at 20 m/s with heading 0
+    const leftCar = createVehicleState(0, 0, 0, 0, 20.0);
+    const leftInput = createInputState();
+    leftInput.steer = -1; // Left key on keyboard / dpad
+    leftInput.throttle = 1.0;
+
+    for (let i = 0; i < 30; i++) {
+      VehicleModel.step(leftCar, leftInput, carData, dt);
+    }
+    // Positive heading turns the car left
+    expect(leftCar.heading).toBeGreaterThan(0);
+
+    const rightCar = createVehicleState(0, 0, 0, 0, 20.0);
+    const rightInput = createInputState();
+    rightInput.steer = 1; // Right key on keyboard / dpad
+    rightInput.throttle = 1.0;
+
+    for (let i = 0; i < 30; i++) {
+      VehicleModel.step(rightCar, rightInput, carData, dt);
+    }
+    // Negative heading turns the car right (opposite direction)
+    expect(rightCar.heading).toBeLessThan(0);
+    expect(Math.sign(rightCar.heading)).toBe(-Math.sign(leftCar.heading));
+  });
+
+  it('returns steerInput to 0 on key release without overshooting', () => {
+    // 1. Build up left steerInput
+    const steerLeftInput = createInputState();
+    steerLeftInput.steer = -1;
+    for (let i = 0; i < 15; i++) {
+      VehicleModel.step(state, steerLeftInput, carData, dt);
+    }
+    expect(state.steerInput).toBeGreaterThan(0.5);
+
+    // 2. Release key (neutral steer = 0)
+    const neutralInput = createInputState();
+    let prevInput = state.steerInput;
+    for (let i = 0; i < 60; i++) {
+      VehicleModel.step(state, neutralInput, carData, dt);
+      // Must not overshoot below 0
+      expect(state.steerInput).toBeGreaterThanOrEqual(0);
+      expect(state.steerInput).toBeLessThanOrEqual(prevInput);
+      prevInput = state.steerInput;
+    }
+    expect(state.steerInput).toBe(0);
+
+    // 3. Repeat for right steerInput (negative steerInput)
+    const steerRightInput = createInputState();
+    steerRightInput.steer = 1;
+    for (let i = 0; i < 15; i++) {
+      VehicleModel.step(state, steerRightInput, carData, dt);
+    }
+    expect(state.steerInput).toBeLessThan(-0.5);
+
+    prevInput = state.steerInput;
+    for (let i = 0; i < 60; i++) {
+      VehicleModel.step(state, neutralInput, carData, dt);
+      // Must not overshoot above 0
+      expect(state.steerInput).toBeLessThanOrEqual(0);
+      expect(state.steerInput).toBeGreaterThanOrEqual(prevInput);
+      prevInput = state.steerInput;
+    }
+    expect(state.steerInput).toBe(0);
+  });
+
+  it('has smaller max wheel angle at 60 m/s than at 5 m/s', () => {
+    const lowSpeedCar = createVehicleState(0, 0, 0, 0, 5.0);
+    const highSpeedCar = createVehicleState(0, 0, 0, 0, 60.0);
+
+    // Full left steer (analog to check instantaneous speed-dependent maxAngle directly)
+    const fullSteer = createInputState();
+    fullSteer.steer = -1;
+    (fullSteer as { isAnalog?: boolean }).isAnalog = true;
+
+    VehicleModel.step(lowSpeedCar, fullSteer, carData, dt);
+    VehicleModel.step(highSpeedCar, fullSteer, carData, dt);
+
+    expect(Math.abs(highSpeedCar.steerAngle)).toBeLessThan(Math.abs(lowSpeedCar.steerAngle));
+    // At 60 m/s, maxAngle is clamped to minSteerAngle (5 deg ~ 0.0873 rad)
+    expect(Math.abs(highSpeedCar.steerAngle)).toBeCloseTo(carData.minSteerAngle, 2);
+    // At 5 m/s, maxAngle is close to maxSteerAngle (30 deg ~ 0.5236 rad)
+    expect(Math.abs(lowSpeedCar.steerAngle)).toBeCloseTo(carData.maxSteerAngle, 1);
+  });
+
+  it('does not change heading when steering at speed 0', () => {
+    state.forwardSpeed = 0;
+    state.speed = 0;
+    state.heading = 0;
+
+    // Full left steer at standstill
+    const leftInput = createInputState();
+    leftInput.steer = -1;
+    for (let i = 0; i < 60; i++) {
+      VehicleModel.step(state, leftInput, carData, dt);
+      expect(state.heading).toBe(0);
+    }
+
+    // Full right steer at standstill
+    const rightInput = createInputState();
+    rightInput.steer = 1;
+    for (let i = 0; i < 60; i++) {
+      VehicleModel.step(state, rightInput, carData, dt);
+      expect(state.heading).toBe(0);
+    }
+  });
+
+  it('produces deterministic bit-identical steering results for identical inputs', () => {
+    const carA = createVehicleState(0, 0, 0, 0, 25.0);
+    const carB = createVehicleState(0, 0, 0, 0, 25.0);
+
+    const inputs: InputState[] = [
+      { steer: -1, throttle: 1, brake: 0, handbrake: false, nitro: false, pause: false },
+      { steer: 0, throttle: 1, brake: 0, handbrake: false, nitro: false, pause: false },
+      { steer: 1, throttle: 0.5, brake: 0, handbrake: true, nitro: false, pause: false },
+      { steer: 0, throttle: 0, brake: 1, handbrake: false, nitro: false, pause: false },
+    ];
+
+    for (let i = 0; i < 240; i++) {
+      const stepInput = inputs[Math.floor(i / 60)];
+      VehicleModel.step(carA, stepInput, carData, dt);
+      VehicleModel.step(carB, stepInput, carData, dt);
+    }
+
+    expect(carA.heading).toBe(carB.heading);
+    expect(carA.steerAngle).toBe(carB.steerAngle);
+    expect(carA.steerInput).toBe(carB.steerInput);
+    expect(carA.angularVelocity).toBe(carB.angularVelocity);
+    expect(carA.forwardSpeed).toBe(carB.forwardSpeed);
+    expect(carA.lateralSpeed).toBe(carB.lateralSpeed);
   });
 });

@@ -28,16 +28,16 @@ export function updateDriftScore(
 
   const absLateral = Math.abs(state.lateralSpeed);
 
-  // Hysteresis threshold check
+  // Hysteresis threshold check (drift only forward)
   if (!state.isDrifting) {
-    if (absLateral >= entrySlipThreshold && state.forwardSpeed > 3.0) {
+    if (absLateral >= entrySlipThreshold && state.forwardSpeed > 3.0 && !state.isReversing) {
       state.isDrifting = true;
       state.driftTime = 0;
       state.driftScore = 0;
       state.driftMultiplier = 1.0;
     }
   } else {
-    if (absLateral < exitSlipThreshold || state.forwardSpeed < 1.0) {
+    if (absLateral < exitSlipThreshold || state.forwardSpeed < 1.0 || state.isReversing) {
       state.isDrifting = false;
       state.driftTime = 0;
       state.driftScore = 0;
@@ -45,15 +45,15 @@ export function updateDriftScore(
     }
   }
 
-  // Accumulate drift score while drifting
-  if (state.isDrifting) {
+  // Accumulate drift score while drifting (guaranteeing forward motion only)
+  if (state.isDrifting && !state.isReversing && state.forwardSpeed > 0) {
     state.driftTime += dt;
     // Multiplier rises for each whole second sustained (+1x per second, starting at 1.0)
     state.driftMultiplier = 1.0 + Math.floor(state.driftTime);
 
     const slipAngle = calculateSlipAngle(state.lateralSpeed, state.forwardSpeed);
     // Score formula from Plan section 7: slipAngle * speed * dt (scaled by 100 for integer-like arcade points)
-    const pointsDelta = slipAngle * state.speed * state.driftMultiplier * 100.0 * dt;
+    const pointsDelta = slipAngle * Math.max(0, state.speed) * state.driftMultiplier * 100.0 * dt;
     state.driftScore += pointsDelta;
   }
 }

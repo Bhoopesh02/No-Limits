@@ -1,15 +1,75 @@
 import { describe, expect, it } from 'vitest';
 import {
   calcCameraFov,
+  calcEasedSpeed,
   calcResponsiveVfov,
   calcSpeedFov,
+  clamp01,
   clampDeltaTime,
   lerp,
   lerpAngle,
+  stepSpeedFactor,
   stepSpring1D,
 } from './cameraMath';
 
 describe('cameraMath', () => {
+  describe('clamp01', () => {
+    it('clamps values below 0 to 0', () => {
+      expect(clamp01(-0.5)).toBe(0);
+      expect(clamp01(-100)).toBe(0);
+    });
+
+    it('clamps values above 1 to 1', () => {
+      expect(clamp01(1.5)).toBe(1);
+      expect(clamp01(999)).toBe(1);
+    });
+
+    it('preserves values between 0 and 1', () => {
+      expect(clamp01(0)).toBe(0);
+      expect(clamp01(0.5)).toBe(0.5);
+      expect(clamp01(1)).toBe(1);
+    });
+  });
+
+  describe('calcEasedSpeed', () => {
+    it('returns 0 when standstill or negative speed', () => {
+      expect(calcEasedSpeed(0, 80)).toBe(0);
+      expect(calcEasedSpeed(-10, 80)).toBe(0);
+    });
+
+    it('caps at 1.0 when exceeding topSpeed (e.g. nitro boost)', () => {
+      expect(calcEasedSpeed(80, 80)).toBe(1.0);
+      expect(calcEasedSpeed(120, 80)).toBe(1.0);
+    });
+
+    it('applies quadratic ease-out curve (stronger response early)', () => {
+      // At half speed (40/80 = 0.5 target):
+      // eased = 1 - (1 - 0.5)^2 = 1 - 0.25 = 0.75
+      expect(calcEasedSpeed(40, 80)).toBe(0.75);
+    });
+  });
+
+  describe('stepSpeedFactor', () => {
+    it('smooths toward eased target over time', () => {
+      let factor = 0;
+      const topSpeed = 80;
+      const speed = 80; // target is 1.0
+      const dt = 1 / 60;
+
+      for (let i = 0; i < 60; i++) {
+        factor = stepSpeedFactor(factor, speed, topSpeed, dt, 4);
+      }
+
+      // After 1 second at smooth rate 4: 1 - exp(-4) ~ 0.9817
+      expect(factor).toBeGreaterThan(0.95);
+      expect(factor).toBeLessThanOrEqual(1.0);
+    });
+
+    it('retains current value if dt <= 0', () => {
+      expect(stepSpeedFactor(0.5, 80, 80, 0)).toBe(0.5);
+    });
+  });
+
   describe('clampDeltaTime', () => {
     it('clamps negative or zero delta time to 0', () => {
       expect(clampDeltaTime(-0.05)).toBe(0);

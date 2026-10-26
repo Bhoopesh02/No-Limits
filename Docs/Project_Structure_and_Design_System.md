@@ -125,6 +125,8 @@ export interface CarData {
   displayName: string;
   mass: number; // kg
   topSpeed: number; // m/s
+  reverseTopSpeed: number; // m/s
+  reverseAccel: number; // m/s^2
   powerCurve: readonly number[]; // normalized torque by speed bucket
   drag: number;
   grip: number;

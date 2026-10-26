@@ -4,17 +4,18 @@ This document describes all supported control methods, default input mappings, a
 
 ## Control Mappings
 
-| Action                | Keyboard                | Gamepad (Standard Layout)                 | Touch Controls (Mobile)                  |
-| :-------------------- | :---------------------- | :---------------------------------------- | :--------------------------------------- |
-| **Steer Left**        | `A` or `Left Arrow`     | Left Stick Left / D-pad Left              | On-screen `LEFT` button (left side)      |
-| **Steer Right**       | `D` or `Right Arrow`    | Left Stick Right / D-pad Right            | On-screen `RIGHT` button (left side)     |
-| **Throttle (Gas)**    | `W` or `Up Arrow`       | Right Trigger (`RT` / `R2`) (analog 0..1) | On-screen `GAS` pedal (right side, 64px) |
-| **Brake / Reverse**   | `S` or `Down Arrow`     | Left Trigger (`LT` / `L2`) (analog 0..1)  | On-screen `BRAKE` pedal (right side)     |
-| **Nitro Boost**       | `Shift` (Left or Right) | `A` (Xbox) / `Cross` (PlayStation)        | On-screen `NITRO` button (right side)    |
-| **Handbrake / Drift** | `Space`                 | `X` (Xbox) / `Square` (PlayStation)       | On-screen `DRIFT` button (right side)    |
-| **Pause Menu**        | `Escape`                | `Start` / `Options`                       | Pause button / system pause              |
-| **Dev Debug Overlay** | Backtick (`` ` ``)      | —                                         | —                                        |
-| **Dev Tuning Panel**  | `F2`                    | —                                         | —                                        |
+| Action                 | Keyboard                | Gamepad (Standard Layout)                 | Touch Controls (Mobile)                  |
+| :--------------------- | :---------------------- | :---------------------------------------- | :--------------------------------------- |
+| **Steer Left**         | `A` or `Left Arrow`     | Left Stick Left / D-pad Left              | On-screen `LEFT` button (left side)      |
+| **Steer Right**        | `D` or `Right Arrow`    | Left Stick Right / D-pad Right            | On-screen `RIGHT` button (left side)     |
+| **Throttle (Gas)**     | `W` or `Up Arrow`       | Right Trigger (`RT` / `R2`) (analog 0..1) | On-screen `GAS` pedal (right side, 64px) |
+| **Brake / Reverse**    | `S` or `Down Arrow`     | Left Trigger (`LT` / `L2`) (analog 0..1)  | On-screen `BRAKE` pedal (right side)     |
+| **Nitro Boost**        | `Shift` (Left or Right) | `A` (Xbox) / `Cross` (PlayStation)        | On-screen `NITRO` button (right side)    |
+| **Handbrake / Drift**  | `Space`                 | `X` (Xbox) / `Square` (PlayStation)       | On-screen `DRIFT` button (right side)    |
+| **Reset Car to Start** | `R`                     | —                                         | —                                        |
+| **Pause Menu**         | `Escape`                | `Start` / `Options`                       | Pause button / system pause              |
+| **Dev Debug Overlay**  | Backtick (`` ` ``)      | —                                         | —                                        |
+| **Dev Tuning Panel**   | `F2`                    | —                                         | —                                        |
 
 ---
 

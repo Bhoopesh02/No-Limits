@@ -1,4 +1,6 @@
-import { BoxGeometry, BufferGeometry, Group, Material, Mesh, MeshStandardMaterial } from 'three';
+import * as THREE from 'three';
+import { Group } from 'three';
+import { createKazeCar, GraphicsTier, KazeCarResult, KazeWheels } from './createKazeCar';
 import { lerp, lerpAngle } from './cameraMath';
 
 export interface CarRenderPose {
@@ -9,81 +11,36 @@ export interface CarRenderPose {
   readonly forwardSpeed?: number;
   readonly lateralSpeed?: number;
   readonly steerAngle?: number;
+  readonly isReversing?: boolean;
 }
+
+export interface CarViewOptions {
+  tier?: GraphicsTier;
+  paintColor?: string | number | THREE.Color;
+}
+
+const WHEEL_RADIUS = 0.35; // meters (from tire geometry in createKazeCar)
 
 export class CarView {
   private readonly root: Group = new Group();
   private readonly chassisGroup: Group = new Group();
-  private readonly geometries: BufferGeometry[] = [];
-  private readonly materials: Material[] = [];
+  private readonly kazeCar: KazeCarResult;
 
   private posX = 0;
   private posY = 0;
   private posZ = 0;
   private heading = 0;
 
-  constructor() {
+  private wheelRollAngle = 0;
+  private lastUpdateTimestampMs = 0;
+
+  constructor(options: CarViewOptions = {}) {
+    this.root.name = 'CarView';
+    this.chassisGroup.name = 'ChassisGroup';
     this.root.add(this.chassisGroup);
-    this.buildPlaceholderMesh();
-  }
 
-  private buildPlaceholderMesh(): void {
-    // 1. Lower chassis / body box
-    // Car is 1.9m wide, 0.45m tall, 4.2m long
-    const bodyGeom = new BoxGeometry(1.9, 0.45, 4.2);
-    const bodyMat = new MeshStandardMaterial({
-      color: 0x3da5ff, // Accent blue
-      roughness: 0.3,
-      metalness: 0.35,
-    });
-    const bodyMesh = new Mesh(bodyGeom, bodyMat);
-    bodyMesh.position.y = 0.35;
-    this.chassisGroup.add(bodyMesh);
-    this.geometries.push(bodyGeom);
-    this.materials.push(bodyMat);
-
-    // 2. Cabin / roof box
-    const cabinGeom = new BoxGeometry(1.4, 0.4, 2.0);
-    const cabinMat = new MeshStandardMaterial({
-      color: 0x121722, // Dark tinted glass
-      roughness: 0.1,
-      metalness: 0.9,
-    });
-    const cabinMesh = new Mesh(cabinGeom, cabinMat);
-    cabinMesh.position.set(0, 0.72, -0.15);
-    this.chassisGroup.add(cabinMesh);
-    this.geometries.push(cabinGeom);
-    this.materials.push(cabinMat);
-
-    // 3. Front Headlights (-Z direction is forward)
-    const lightGeom = new BoxGeometry(0.3, 0.1, 0.05);
-    const headlightMat = new MeshStandardMaterial({
-      color: 0x00e5ff,
-      emissive: 0x00e5ff,
-      emissiveIntensity: 0.9,
-    });
-    const leftHeadlight = new Mesh(lightGeom, headlightMat);
-    leftHeadlight.position.set(-0.65, 0.38, -2.11);
-    const rightHeadlight = new Mesh(lightGeom, headlightMat);
-    rightHeadlight.position.set(0.65, 0.38, -2.11);
-    this.chassisGroup.add(leftHeadlight, rightHeadlight);
-    this.geometries.push(lightGeom);
-    this.materials.push(headlightMat);
-
-    // 4. Rear Taillights (+Z direction is rear)
-    const tailGeom = new BoxGeometry(0.35, 0.1, 0.05);
-    const taillightMat = new MeshStandardMaterial({
-      color: 0xff4d5e, // Red
-      emissive: 0xff4d5e,
-      emissiveIntensity: 0.9,
-    });
-    const leftTaillight = new Mesh(tailGeom, taillightMat);
-    leftTaillight.position.set(-0.65, 0.38, 2.11);
-    const rightTaillight = new Mesh(tailGeom, taillightMat);
-    rightTaillight.position.set(0.65, 0.38, 2.11);
-    this.chassisGroup.add(leftTaillight, rightTaillight);
-    this.geometries.push(tailGeom);
-    this.materials.push(taillightMat);
+    this.kazeCar = createKazeCar(options);
+    this.chassisGroup.add(this.kazeCar.group);
   }
 
   public getRoot(): Group {
@@ -98,9 +55,26 @@ export class CarView {
     return this.heading;
   }
 
+  public getWheels(): KazeWheels {
+    return this.kazeCar.wheels;
+  }
+
+  public getKazeCar(): KazeCarResult {
+    return this.kazeCar;
+  }
+
+  public setPaintColor(color: string | number | THREE.Color): void {
+    this.kazeCar.setPaintColor(color);
+  }
+
+  public setReversing(isReversing: boolean): void {
+    this.kazeCar.setReversing(isReversing);
+  }
+
   /**
-   * Interpolates position, heading, drift slide angle and steering roll
-   * between previous simulation state and current simulation state.
+   * Interpolates position, heading, drift slide angle, chassis body roll,
+   * front steering angle, and wheel rolling rotation between previous simulation
+   * state and current simulation state.
    * Guarantees perfectly smooth motion with zero allocations in the game loop.
    */
   public update(previous: CarRenderPose, current: CarRenderPose, alpha: number): void {
@@ -114,6 +88,10 @@ export class CarView {
     this.root.position.set(this.posX, this.posY, this.posZ);
     this.root.rotation.y = this.heading;
 
+    if (current.isReversing !== undefined) {
+      this.setReversing(current.isReversing);
+    }
+
     // Visual drift yaw (slide angle) and body roll on steering
     const forwardSpeed = lerp(previous.forwardSpeed ?? 0, current.forwardSpeed ?? 0, t);
     const lateralSpeed = lerp(previous.lateralSpeed ?? 0, current.lateralSpeed ?? 0, t);
@@ -126,17 +104,32 @@ export class CarView {
 
     // Subtle chassis roll into turns
     this.chassisGroup.rotation.z = -steerAngle * 0.12;
+
+    // 1. Steering pivot on front wheels rotates from steering angle
+    this.kazeCar.wheels.frontLeft.steer.rotation.y = steerAngle;
+    this.kazeCar.wheels.frontRight.steer.rotation.y = steerAngle;
+
+    // 2. Wheel rolling rotation from forward speed
+    const now = typeof performance !== 'undefined' ? performance.now() : 0;
+    const dt =
+      this.lastUpdateTimestampMs > 0 && now > this.lastUpdateTimestampMs
+        ? Math.min(0.1, (now - this.lastUpdateTimestampMs) * 0.001)
+        : 1 / 60;
+    this.lastUpdateTimestampMs = now;
+
+    // v = omega * r -> omega = v / r
+    // Negative roll around X moves top of wheel forward (-Z direction)
+    const deltaAngle = (forwardSpeed / WHEEL_RADIUS) * dt;
+    this.wheelRollAngle = (this.wheelRollAngle - deltaAngle) % (Math.PI * 2);
+
+    this.kazeCar.wheels.frontLeft.roll.rotation.x = this.wheelRollAngle;
+    this.kazeCar.wheels.frontRight.roll.rotation.x = this.wheelRollAngle;
+    this.kazeCar.wheels.rearLeft.roll.rotation.x = this.wheelRollAngle;
+    this.kazeCar.wheels.rearRight.roll.rotation.x = this.wheelRollAngle;
   }
 
   public dispose(): void {
-    for (const geom of this.geometries) {
-      geom.dispose();
-    }
-    for (const mat of this.materials) {
-      mat.dispose();
-    }
-    this.geometries.length = 0;
-    this.materials.length = 0;
+    this.kazeCar.dispose();
     this.chassisGroup.clear();
     this.root.clear();
   }

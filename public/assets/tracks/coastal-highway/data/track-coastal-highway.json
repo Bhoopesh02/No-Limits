@@ -1,0 +1,28 @@
+{
+  "id": "coastal-highway",
+  "displayName": "Coastal City Highway",
+  "lengthMeters": 2478,
+  "laps": 3,
+  "checkpointCount": 16,
+  "scenery": "assets/tracks/coastal-highway/model/track-coastal-highway.glb",
+  "timeOfDayStart": 17.0,
+  "controlPoints": [
+    { "x": 0, "y": 0, "z": 80, "width": 15 },
+    { "x": 0, "y": 0, "z": -200, "width": 15 },
+    { "x": 0, "y": 0, "z": -550, "width": 15 },
+    { "x": 25, "y": 0, "z": -680, "width": 15 },
+    { "x": 90, "y": 0, "z": -760, "width": 15 },
+    { "x": 190, "y": 0, "z": -790, "width": 15 },
+    { "x": 290, "y": 0, "z": -750, "width": 15 },
+    { "x": 350, "y": 0, "z": -640, "width": 15 },
+    { "x": 370, "y": 0, "z": -480, "width": 15 },
+    { "x": 330, "y": 0, "z": -340, "width": 15 },
+    { "x": 340, "y": 0, "z": -190, "width": 15 },
+    { "x": 390, "y": 0, "z": -50, "width": 15 },
+    { "x": 395, "y": 0, "z": 80, "width": 15 },
+    { "x": 330, "y": 0, "z": 190, "width": 15 },
+    { "x": 220, "y": 0, "z": 230, "width": 15 },
+    { "x": 110, "y": 0, "z": 190, "width": 15 },
+    { "x": 35, "y": 0, "z": 140, "width": 15 }
+  ]
+}

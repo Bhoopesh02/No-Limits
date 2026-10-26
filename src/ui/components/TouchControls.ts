@@ -6,14 +6,31 @@ export interface TouchControlsElement extends HTMLElement {
   dispose(): void;
 }
 
-export function shouldShowTouchControls(): boolean {
-  if (typeof window === 'undefined') return false;
+export function isPointInBounds(
+  x: number,
+  y: number,
+  bounds: { left: number; right: number; top: number; bottom: number },
+): boolean {
+  return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
+}
+
+export function shouldShowTouchControlsGiven(search: string, isCoarsePointer: boolean): boolean {
   try {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(search);
     if (params.get('touch') === '1') {
       return true;
     }
-    return window.matchMedia('(pointer: coarse)').matches;
+  } catch {
+    // Ignore URL parse errors
+  }
+  return isCoarsePointer;
+}
+
+export function shouldShowTouchControls(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const isCoarse = window.matchMedia('(pointer: coarse)').matches;
+    return shouldShowTouchControlsGiven(window.location.search, isCoarse);
   } catch {
     return false;
   }
@@ -83,11 +100,7 @@ function createTouchButton(config: TouchButtonConfig): {
     if (e.pointerId === activePointerId) {
       // Release button immediately if the player slides their finger outside bounds
       const rect = btn.getBoundingClientRect();
-      const isInside =
-        e.clientX >= rect.left &&
-        e.clientX <= rect.right &&
-        e.clientY >= rect.top &&
-        e.clientY <= rect.bottom;
+      const isInside = isPointInBounds(e.clientX, e.clientY, rect);
       if (!isInside) {
         release();
       }

@@ -37,9 +37,12 @@ export function updateNitro(
     }
   }
 
-  // 2. Trigger nitro ignition if requested and ready
+  // 2. Trigger nitro ignition if requested and ready (blocked while speed < 0 or in reverse)
   if (
     wantsNitro &&
+    !state.isReversing &&
+    state.forwardSpeed >= 0 &&
+    state.speed >= 0 &&
     state.nitroActiveTime <= 0 &&
     state.nitroCooldownTimer <= 0 &&
     state.nitroAmount >= MIN_NITRO_FIRE_THRESHOLD
@@ -59,8 +62,13 @@ export function updateNitro(
       state.nitroCooldownTimer = nitroCooldown;
     }
   } else {
-    // 4. Refill nitro during active drifts when not currently firing
-    if (state.isDrifting && state.nitroAmount < maxNitro) {
+    // 4. Refill nitro during active drifts when not currently firing (no growth in reverse)
+    if (
+      state.isDrifting &&
+      !state.isReversing &&
+      state.forwardSpeed > 0 &&
+      state.nitroAmount < maxNitro
+    ) {
       state.nitroAmount += nitroFillRate * dt;
     }
 

@@ -8,8 +8,37 @@ export function clampDeltaTime(dt: number, maxDt = 0.1): number {
   return dt > maxDt ? maxDt : dt;
 }
 
+export function clamp01(v: number): number {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
 export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
+}
+
+/**
+ * Calculates normalized eased speed (0..1) with quadratic ease-out.
+ * Effect is strong early and flattens near top speed.
+ */
+export function calcEasedSpeed(speed: number, topSpeed: number): number {
+  if (topSpeed <= 0) return 0;
+  const target = clamp01(speed / topSpeed);
+  return 1 - (1 - target) * (1 - target);
+}
+
+/**
+ * Frame-rate independent exponential smoothing of normalized speed factor.
+ */
+export function stepSpeedFactor(
+  currentFactor: number,
+  speed: number,
+  topSpeed: number,
+  dt: number,
+  speedSmooth = 4,
+): number {
+  if (dt <= 0) return currentFactor;
+  const eased = calcEasedSpeed(speed, topSpeed);
+  return currentFactor + (eased - currentFactor) * (1 - Math.exp(-speedSmooth * dt));
 }
 
 /**

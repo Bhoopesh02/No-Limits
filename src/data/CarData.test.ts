@@ -14,5 +14,7 @@ describe('CarData', () => {
     expect(DEFAULT_CAR_KAZE.driftEntrySlip).toBeGreaterThan(DEFAULT_CAR_KAZE.driftExitSlip);
     expect(DEFAULT_CAR_KAZE.nitroDuration).toBeGreaterThan(0);
     expect(DEFAULT_CAR_KAZE.nitroCooldown).toBeGreaterThan(0);
+    expect(DEFAULT_CAR_KAZE.reverseTopSpeed).toBe(12);
+    expect(DEFAULT_CAR_KAZE.reverseAccel).toBeGreaterThan(0);
   });
 });

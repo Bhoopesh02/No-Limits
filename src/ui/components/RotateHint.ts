@@ -4,23 +4,40 @@ export interface RotateHintElement extends HTMLElement {
   dispose(): void;
 }
 
+export interface RotateHintConditions {
+  isTouchForced: boolean;
+  isCoarsePointer: boolean;
+  isPortraitMedia: boolean;
+  innerWidth: number;
+  innerHeight: number;
+}
+
+export function shouldShowRotateHintGiven(conditions: RotateHintConditions): boolean {
+  // Must be a touch device (or forced via ?touch=1)
+  const isTouchDevice = conditions.isTouchForced || conditions.isCoarsePointer;
+  if (!isTouchDevice) {
+    return false;
+  }
+
+  // Portrait orientation detection via CSS media or window aspect ratio
+  return conditions.isPortraitMedia || conditions.innerHeight > conditions.innerWidth;
+}
+
 export function shouldShowRotateHint(): boolean {
   if (typeof window === 'undefined') return false;
   try {
     const params = new URLSearchParams(window.location.search);
     const isTouchForced = params.get('touch') === '1';
     const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+    const isPortraitMedia = window.matchMedia('(orientation: portrait)').matches;
 
-    // Must be a touch device (or forced via ?touch=1)
-    if (!isTouchForced && !isCoarsePointer) {
-      return false;
-    }
-
-    const isPortrait =
-      window.matchMedia('(orientation: portrait)').matches ||
-      window.innerHeight > window.innerWidth;
-
-    return isPortrait;
+    return shouldShowRotateHintGiven({
+      isTouchForced,
+      isCoarsePointer,
+      isPortraitMedia,
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+    });
   } catch {
     return false;
   }

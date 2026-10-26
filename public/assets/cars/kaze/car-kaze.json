@@ -1,0 +1,32 @@
+{
+  "id": "kaze",
+  "displayName": "Kaze GT",
+  "mass": 1250,
+  "topSpeed": 80.55555555555556,
+  "reverseTopSpeed": 12,
+  "reverseAccel": 4.37,
+  "wheelbase": 2.65,
+  "engineForce": 9100,
+  "powerCurve": [1.0, 0.95, 0.88, 0.76, 0.62, 0.45],
+  "drag": 0.32,
+  "grip": 8.5,
+  "driftGripFactor": 0.5,
+  "maxSteerAngle": 0.55,
+  "steerSpeedFalloff": 0.45,
+  "nitroStrength": 1.5,
+  "nitroDuration": 3.5,
+  "nitroCooldown": 6.0,
+  "maxNitro": 1.0,
+  "nitroFillRate": 0.25,
+  "nitroBoostAccel": 8.5,
+  "nitroBoostTopSpeed": 1.15,
+  "driftEntrySlip": 3.0,
+  "driftExitSlip": 1.2,
+  "handbrakeGripFactor": 0.2,
+  "models": {
+    "low": "/assets/cars/kaze/car-kaze-low.glb",
+    "medium": "/assets/cars/kaze/car-kaze-med.glb",
+    "high": "/assets/cars/kaze/car-kaze-high.glb"
+  },
+  "paints": ["#3DA5FF", "#FF4D5E", "#FFC933", "#F2F5FA", "#121722"]
+}

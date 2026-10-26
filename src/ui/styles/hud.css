@@ -110,6 +110,23 @@
   line-height: 1;
 }
 
+.nl-hud-speedometer__gear {
+  font-size: var(--fs-12);
+  font-weight: 700;
+  color: #05080f;
+  background-color: var(--warning);
+  padding: 2px 6px;
+  border-radius: var(--radius-s);
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-shadow: none;
+}
+
+.nl-hud-speedometer.is-reversing .nl-hud-speedometer__value {
+  color: var(--warning);
+  text-shadow: 0 0 16px rgba(255, 201, 51, 0.4);
+}
+
 .nl-hud-speedometer.is-warning .nl-hud-speedometer__value {
   color: var(--danger);
   text-shadow: 0 0 16px rgba(255, 77, 94, 0.5);
@@ -423,4 +440,61 @@
 [data-reduced-motion='true'] .nl-hud-drift {
   transition: none !important;
   transform: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   Lap Timer HUD Widget
+   -------------------------------------------------------------------------- */
+.nl-hud-lap-timer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  background-color: rgba(18, 23, 34, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-display);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  min-width: 140px;
+}
+
+.nl-hud-lap-timer__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.nl-hud-lap-timer__label {
+  font-family: var(--font-body);
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+}
+
+.nl-hud-lap-timer__value {
+  font-size: var(--fs-16);
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.nl-hud-lap-timer__value--best {
+  color: var(--accent);
+}
+
+.nl-hud-lap-timer__row--current .nl-hud-lap-timer__value {
+  color: #ffffff;
+}
+
+.nl-hud-group--lap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+  pointer-events: none;
 }

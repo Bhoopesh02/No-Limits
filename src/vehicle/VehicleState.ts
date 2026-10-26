@@ -24,7 +24,9 @@ export interface VehicleState {
   speed: number; // total planar speed in m/s = hypot(forwardSpeed, lateralSpeed)
   forwardSpeed: number; // m/s forward velocity along car heading
   lateralSpeed: number; // m/s sideways velocity perpendicular to car heading (+right, -left)
-  steerAngle: number; // front wheel steering angle in radians (+right, -left)
+  steerAngle: number; // front wheel steering angle in radians (+left, -right)
+  steerInput: number; // normalized steering input in [-1, 1] after ramp
+  angularVelocity: number; // smoothed yaw angular velocity in rad/s
   nitroAmount: number; // nitro gauge charge from 0.0 to 1.0
   nitroActiveTime: number; // seconds remaining for current nitro burst
   nitroCooldownTimer: number; // seconds remaining for cooldown after nitro depletion
@@ -32,6 +34,7 @@ export interface VehicleState {
   driftTime: number; // duration of current continuous drift in seconds
   driftScore: number; // accumulated drift points in current drift
   driftMultiplier: number; // current drift multiplier (1.0 + time held)
+  isReversing: boolean; // whether car is currently in reverse motion
 }
 
 export function createVehicleState(x = 0, y = 0, z = 0, heading = 0, speed = 0): VehicleState {
@@ -44,6 +47,8 @@ export function createVehicleState(x = 0, y = 0, z = 0, heading = 0, speed = 0):
     forwardSpeed: speed,
     lateralSpeed: 0,
     steerAngle: 0,
+    steerInput: 0,
+    angularVelocity: 0,
     nitroAmount: 1.0, // starts full
     nitroActiveTime: 0,
     nitroCooldownTimer: 0,
@@ -51,6 +56,7 @@ export function createVehicleState(x = 0, y = 0, z = 0, heading = 0, speed = 0):
     driftTime: 0,
     driftScore: 0,
     driftMultiplier: 1.0,
+    isReversing: speed < 0,
   };
 }
 
@@ -66,6 +72,8 @@ export function copyVehicleState(source: VehicleState, target: VehicleState): vo
   target.forwardSpeed = source.forwardSpeed;
   target.lateralSpeed = source.lateralSpeed;
   target.steerAngle = source.steerAngle;
+  target.steerInput = source.steerInput;
+  target.angularVelocity = source.angularVelocity;
   target.nitroAmount = source.nitroAmount;
   target.nitroActiveTime = source.nitroActiveTime;
   target.nitroCooldownTimer = source.nitroCooldownTimer;
@@ -73,4 +81,5 @@ export function copyVehicleState(source: VehicleState, target: VehicleState): vo
   target.driftTime = source.driftTime;
   target.driftScore = source.driftScore;
   target.driftMultiplier = source.driftMultiplier;
+  target.isReversing = source.isReversing;
 }

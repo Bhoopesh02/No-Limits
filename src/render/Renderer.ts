@@ -1,11 +1,8 @@
 import {
   Color,
-  CylinderGeometry,
   DirectionalLight,
   GridHelper,
   HemisphereLight,
-  InstancedMesh,
-  Matrix4,
   Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
@@ -34,7 +31,6 @@ export class Renderer {
 
   private groundMesh: Mesh | null = null;
   private gridHelper: GridHelper | null = null;
-  private markerPillars: InstancedMesh | null = null;
   private hemiLight: HemisphereLight | null = null;
   private dirLight: DirectionalLight | null = null;
 
@@ -130,29 +126,6 @@ export class Renderer {
     this.gridHelper.position.y = 0.01;
     this.scene.add(this.gridHelper);
 
-    // Instanced marker pillars along roadside for enhanced speed perception
-    const pillarCount = 200;
-    const pillarGeom = new CylinderGeometry(0.25, 0.25, 2.5, 8);
-    const pillarMat = new MeshStandardMaterial({
-      color: 0x3da5ff,
-      roughness: 0.4,
-      metalness: 0.6,
-    });
-    this.markerPillars = new InstancedMesh(pillarGeom, pillarMat, pillarCount);
-    const dummyMat4 = new Matrix4();
-    let idx = 0;
-    for (let i = 0; i < 100; i++) {
-      const z = (i - 50) * 40; // Spaced every 40m from -2000m to +2000m
-      // Left pillar (x = -12)
-      dummyMat4.makeTranslation(-12, 1.25, z);
-      this.markerPillars.setMatrixAt(idx++, dummyMat4);
-      // Right pillar (x = +12)
-      dummyMat4.makeTranslation(12, 1.25, z);
-      this.markerPillars.setMatrixAt(idx++, dummyMat4);
-    }
-    this.markerPillars.instanceMatrix.needsUpdate = true;
-    this.scene.add(this.markerPillars);
-
     // Hemisphere light (sky and bounce)
     this.hemiLight = new HemisphereLight(0xddeeff, 0x121722, 0.75);
     this.scene.add(this.hemiLight);
@@ -196,12 +169,6 @@ export class Renderer {
         this.gridHelper.material.dispose();
       }
       this.scene.remove(this.gridHelper);
-    }
-
-    if (this.markerPillars) {
-      this.markerPillars.geometry.dispose();
-      (this.markerPillars.material as MeshStandardMaterial).dispose();
-      this.scene.remove(this.markerPillars);
     }
 
     if (this.hemiLight) {
