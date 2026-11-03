@@ -13,6 +13,24 @@ export const MAX_TRACK_PLUS_CAR_BYTES = 20 * 1024 * 1024; // 20 MB budget
 export const MAX_TEXTURE_DIMENSION = 2048;
 
 /**
+ * Validates that data JSON files for cars and tracks reside inside a "data" subfolder,
+ * not directly in the car or track folder.
+ * Example invalid: assets/cars/kaze/car-kaze.json
+ * Example valid: assets/cars/kaze/data/car-kaze.json
+ */
+export function validateDataFileLocation(relativePath) {
+  const normalized = relativePath.replace(/\\/g, '/');
+  const directUnderCategoryRegex = /^assets\/(?:cars|tracks)\/[^/]+\/[^/]+\.json$/;
+  if (directUnderCategoryRegex.test(normalized)) {
+    return {
+      valid: false,
+      error: `Data file "${normalized}" must be in a "data/" subfolder, not sitting directly in the parent folder.`,
+    };
+  }
+  return { valid: true };
+}
+
+/**
  * Validates whether an asset file name conforms to project naming rules.
  * Allowed patterns from AGENTS.md Naming table:
  * - Model (GLB): kind-name-tier.glb or kind-name.glb (e.g. car-kaze-high.glb, scenery-coastal.glb)

@@ -4,6 +4,7 @@ import './ui/styles/base.css';
 import './ui/styles/components.css';
 import './ui/styles/hud.css';
 import './ui/styles/touchControls.css';
+import './ui/styles/screens.css';
 import { App } from './app/App';
 import { GameInfo } from './data/GameInfo';
 

@@ -19,6 +19,30 @@ This document describes all supported control methods, default input mappings, a
 
 ---
 
+## Menu Navigation Controls
+
+| Action               | Keyboard                   | Gamepad                            | Touch / Mouse            |
+| :------------------- | :------------------------- | :--------------------------------- | :----------------------- |
+| **Navigate Up**      | `Up Arrow`                 | D-pad Up                           | Tap / Click              |
+| **Navigate Down**    | `Down Arrow` / `Tab`       | D-pad Down                         | Tap / Click              |
+| **Confirm / Select** | `Enter` / `Space`          | `A` (Xbox) / `Cross` (PlayStation) | Tap / Click button       |
+| **Back / Cancel**    | `Escape`                   | `B` (Xbox) / `Circle` (PS)         | Tap / Click Close / Back |
+| **Focus Rings**      | Prominent 2px cyan outline | Prominent 2px cyan outline         | Visible on keyboard/pad  |
+
+---
+
+## Menu Navigation Controls
+
+| Action               | Keyboard                   | Gamepad                            | Touch / Mouse            |
+| :------------------- | :------------------------- | :--------------------------------- | :----------------------- |
+| **Navigate Up**      | `Up Arrow`                 | D-pad Up                           | Tap / Click              |
+| **Navigate Down**    | `Down Arrow` / `Tab`       | D-pad Down                         | Tap / Click              |
+| **Confirm / Select** | `Enter` / `Space`          | `A` (Xbox) / `Cross` (PlayStation) | Tap / Click button       |
+| **Back / Cancel**    | `Escape`                   | `B` (Xbox) / `Circle` (PS)         | Tap / Click Close / Back |
+| **Focus Rings**      | Prominent 2px cyan outline | Prominent 2px cyan outline         | Visible on keyboard/pad  |
+
+---
+
 ## Input Architecture & Details
 
 ### 1. Radial Deadzone

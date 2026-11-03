@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 import { Group } from 'three';
-import { createKazeCar, GraphicsTier, KazeCarResult, KazeWheels } from './createKazeCar';
+import { getCarDetailForTier, type CarDetailLevel } from '../data/CarRenderBudget';
+import { CarFactory, type CarInstance } from './car/CarFactory';
+import type { KazeWheels } from './car/carWheels';
 import { lerp, lerpAngle } from './cameraMath';
+
+export type GraphicsTier = 'low' | 'medium' | 'high';
 
 export interface CarRenderPose {
   readonly x: number;
@@ -16,15 +20,19 @@ export interface CarRenderPose {
 
 export interface CarViewOptions {
   tier?: GraphicsTier;
+  detail?: CarDetailLevel;
   paintColor?: string | number | THREE.Color;
+  factory?: CarFactory;
 }
 
-const WHEEL_RADIUS = 0.35; // meters (from tire geometry in createKazeCar)
+const WHEEL_RADIUS = 0.35; // meters (from tire geometry in CarFactory)
 
 export class CarView {
   private readonly root: Group = new Group();
   private readonly chassisGroup: Group = new Group();
-  private readonly kazeCar: KazeCarResult;
+  private readonly factory: CarFactory;
+  private readonly ownsFactory: boolean;
+  private readonly carInstance: CarInstance;
 
   private posX = 0;
   private posY = 0;
@@ -39,8 +47,18 @@ export class CarView {
     this.chassisGroup.name = 'ChassisGroup';
     this.root.add(this.chassisGroup);
 
-    this.kazeCar = createKazeCar(options);
-    this.chassisGroup.add(this.kazeCar.group);
+    if (options.factory) {
+      this.factory = options.factory;
+      this.ownsFactory = false;
+    } else {
+      this.factory = new CarFactory();
+      this.ownsFactory = true;
+    }
+
+    const detail: CarDetailLevel =
+      options.detail ?? (options.tier ? getCarDetailForTier(options.tier) : 'medium');
+    this.carInstance = this.factory.create(detail, options.paintColor ?? 0x3da5ff);
+    this.chassisGroup.add(this.carInstance.root);
   }
 
   public getRoot(): Group {
@@ -56,19 +74,26 @@ export class CarView {
   }
 
   public getWheels(): KazeWheels {
-    return this.kazeCar.wheels;
+    return this.carInstance.wheels;
   }
 
-  public getKazeCar(): KazeCarResult {
-    return this.kazeCar;
+  public getCarInstance(): CarInstance {
+    return this.carInstance;
+  }
+
+  /**
+   * Alias for backwards compatibility with existing call sites and tests.
+   */
+  public getKazeCar(): CarInstance {
+    return this.carInstance;
   }
 
   public setPaintColor(color: string | number | THREE.Color): void {
-    this.kazeCar.setPaintColor(color);
+    this.carInstance.setPaintColor(color);
   }
 
   public setReversing(isReversing: boolean): void {
-    this.kazeCar.setReversing(isReversing);
+    this.carInstance.setReversing(isReversing);
   }
 
   /**
@@ -97,7 +122,6 @@ export class CarView {
     const lateralSpeed = lerp(previous.lateralSpeed ?? 0, current.lateralSpeed ?? 0, t);
     const steerAngle = lerp(previous.steerAngle ?? 0, current.steerAngle ?? 0, t);
 
-    // Slide angle beta = atan2(lateralSpeed, forwardSpeed)
     // Lateral slide pushes the visual body angle towards velocity vector
     const slideAngle = forwardSpeed > 1.5 ? Math.atan2(lateralSpeed, forwardSpeed) : 0;
     this.chassisGroup.rotation.y = slideAngle * 0.85;
@@ -106,8 +130,8 @@ export class CarView {
     this.chassisGroup.rotation.z = -steerAngle * 0.12;
 
     // 1. Steering pivot on front wheels rotates from steering angle
-    this.kazeCar.wheels.frontLeft.steer.rotation.y = steerAngle;
-    this.kazeCar.wheels.frontRight.steer.rotation.y = steerAngle;
+    this.carInstance.wheels.frontLeft.steer.rotation.y = steerAngle;
+    this.carInstance.wheels.frontRight.steer.rotation.y = steerAngle;
 
     // 2. Wheel rolling rotation from forward speed
     const now = typeof performance !== 'undefined' ? performance.now() : 0;
@@ -122,14 +146,17 @@ export class CarView {
     const deltaAngle = (forwardSpeed / WHEEL_RADIUS) * dt;
     this.wheelRollAngle = (this.wheelRollAngle - deltaAngle) % (Math.PI * 2);
 
-    this.kazeCar.wheels.frontLeft.roll.rotation.x = this.wheelRollAngle;
-    this.kazeCar.wheels.frontRight.roll.rotation.x = this.wheelRollAngle;
-    this.kazeCar.wheels.rearLeft.roll.rotation.x = this.wheelRollAngle;
-    this.kazeCar.wheels.rearRight.roll.rotation.x = this.wheelRollAngle;
+    this.carInstance.wheels.frontLeft.roll.rotation.x = this.wheelRollAngle;
+    this.carInstance.wheels.frontRight.roll.rotation.x = this.wheelRollAngle;
+    this.carInstance.wheels.rearLeft.roll.rotation.x = this.wheelRollAngle;
+    this.carInstance.wheels.rearRight.roll.rotation.x = this.wheelRollAngle;
   }
 
   public dispose(): void {
-    this.kazeCar.dispose();
+    this.carInstance.dispose();
+    if (this.ownsFactory) {
+      this.factory.dispose();
+    }
     this.chassisGroup.clear();
     this.root.clear();
   }

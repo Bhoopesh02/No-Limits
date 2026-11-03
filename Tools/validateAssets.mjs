@@ -13,6 +13,7 @@ import {
   parseGlbTriangles,
   parseKtx2Dimensions,
   validateAssetName,
+  validateDataFileLocation,
   validateTrackData,
 } from './lib/assetRules.mjs';
 
@@ -171,6 +172,16 @@ for (const filePath of allAssetFiles) {
       } catch (err) {
         warn(`KTX2 dimension check for ${relativePath}: ${err.message}`);
       }
+    }
+  }
+
+  // Data file location check
+  if (fileName.endsWith('.json')) {
+    const locResult = validateDataFileLocation(relativePath);
+    if (!locResult.valid) {
+      fail(locResult.error);
+    } else {
+      pass(`Valid data file location: ${relativePath}`);
     }
   }
 

@@ -13,26 +13,15 @@ const __dirname = path.dirname(__filename);
 const ALLOWED_OVER_500_LINES = new Map<string, string>([
   ['src/ui/styleguide/Styleguide.ts', 'TODO: split styleguide into modular section components'],
   [
-    'src/render/createKazeCar.ts',
-    'TODO: split procedural car creation into body, wheels, interior, and lighting modules',
-  ],
-  [
     'src/render/TrackView.ts',
     'TODO: split track view into road geometry, barrier generation, and marker subsystems',
-  ],
-  [
-    'src/app/App.ts',
-    'TODO: state machine and screen manager in Week 3 roadmap will absorb bootstrap responsibilities',
   ],
 ]);
 
 /**
  * Target line count for App.ts is under 400 lines.
- * Because App.ts is currently at 518 lines during Week 2/Task 7, its limit is set to
- * 550 (current size rounded up to the next 50) so it cannot grow further and can only shrink
- * as Week 3 StateMachine and ScreenManager extract logic from it.
  */
-const APP_TS_MAX_LINES = 550;
+const APP_TS_MAX_LINES = 400;
 
 function walkTsFiles(dir: string): string[] {
   let results: string[] = [];
@@ -82,7 +71,7 @@ describe('Architecture file size safeguards', () => {
     ).toEqual([]);
   });
 
-  it('enforces that App.ts stays within its shrinking ceiling toward 400 lines', () => {
+  it('enforces that App.ts stays within 400 lines', () => {
     const appTsPath = path.join(srcRoot, 'app', 'App.ts');
     expect(fs.existsSync(appTsPath)).toBe(true);
 
@@ -91,8 +80,7 @@ describe('Architecture file size safeguards', () => {
 
     expect(
       lineCount,
-      `App.ts has ${lineCount} lines, which exceeds the temporary 550-line ceiling toward the 400-line target.`,
+      `App.ts has ${lineCount} lines, which exceeds the 400-line architecture limit.`,
     ).toBeLessThanOrEqual(APP_TS_MAX_LINES);
   });
 });
-

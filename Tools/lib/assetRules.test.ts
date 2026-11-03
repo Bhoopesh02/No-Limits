@@ -7,6 +7,7 @@ import {
   parseGlbTriangles,
   parseKtx2Dimensions,
   validateAssetName,
+  validateDataFileLocation,
   validateTrackData,
 } from './assetRules.mjs';
 
@@ -253,6 +254,23 @@ describe('assetRules pure logic', () => {
       const result = checkAssetBudget(trackBytes, carBytes);
       expect(result.valid).toBe(false);
       expect(result.totalBytes).toBe(23 * 1024 * 1024);
+    });
+  });
+
+  describe('validateDataFileLocation', () => {
+    it('fails when a data JSON file sits directly in a car or track folder', () => {
+      expect(validateDataFileLocation('assets/cars/kaze/car-kaze.json').valid).toBe(false);
+      expect(
+        validateDataFileLocation('assets/tracks/coastal-highway/track-coastal-highway.json').valid,
+      ).toBe(false);
+    });
+
+    it('passes when a data JSON file is inside the data/ subfolder', () => {
+      expect(validateDataFileLocation('assets/cars/kaze/data/car-kaze.json').valid).toBe(true);
+      expect(
+        validateDataFileLocation('assets/tracks/coastal-highway/data/track-coastal-highway.json')
+          .valid,
+      ).toBe(true);
     });
   });
 });
