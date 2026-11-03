@@ -1,10 +1,5 @@
 import { PerspectiveCamera, Vector3 } from 'three';
-import {
-  calcResponsiveVfov,
-  clamp01,
-  clampDeltaTime,
-  lerpAngle,
-} from './cameraMath';
+import { calcResponsiveVfov, clamp01, clampDeltaTime, lerpAngle } from './cameraMath';
 
 export { clamp01 };
 
@@ -105,8 +100,7 @@ export class CameraRig {
     this.heightMax = options.heightMax ?? options.height ?? HEIGHT_MAX;
     this.fovMin = options.fovMin ?? options.baseFov ?? FOV_MIN;
     this.reduceMotion = options.reduceMotion ?? false;
-    this.fovMax =
-      options.fovMax ?? (this.reduceMotion ? FOV_MAX_REDUCED_MOTION : FOV_MAX);
+    this.fovMax = options.fovMax ?? (this.reduceMotion ? FOV_MAX_REDUCED_MOTION : FOV_MAX);
     this.lookAtHeight = options.lookAtHeight ?? 1.2;
     this.maxSpeed = options.maxSpeed ?? 80.56;
     this.zoomCapSpeed = options.zoomCapSpeed ?? ZOOM_CAP_SPEED_MS;

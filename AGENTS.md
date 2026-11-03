@@ -174,6 +174,7 @@ Asset file names are lowercase kebab-case.
 ## Definition of done for a task
 
 - `npm run typecheck`, `npm run lint`, `npm test` and `npm run build` all pass with no warnings.
+- `npm run check:size` and `npm run validate:assets` pass.
 - Follows the rules above (naming, module boundaries, no per-frame allocations, fixed timestep).
 - Includes Vitest tests for pure logic (vehicle model, economy formulas, XP curve, drift score, upgrade costs, save migrations) where it makes sense.
 - Ends with a short summary: files created or changed, what to check in the browser, and the suggested next task.

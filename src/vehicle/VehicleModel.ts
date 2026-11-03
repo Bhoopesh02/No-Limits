@@ -54,8 +54,7 @@ export class VehicleModel {
 
     // 8) Compute isReversing flag (derived from reverse speed or reverse command at standstill)
     state.isReversing =
-      state.forwardSpeed < -0.01 ||
-      (brake > 0 && throttle === 0 && state.forwardSpeed <= 0.05);
+      state.forwardSpeed < -0.01 || (brake > 0 && throttle === 0 && state.forwardSpeed <= 0.05);
 
     // 9) Write state and compute signed planar speed
     VehicleModel.writeFinalState(state);

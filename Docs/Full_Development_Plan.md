@@ -91,6 +91,7 @@ Update order each step:
 Starting parameters (per car, in `CarData`): mass, engine power curve, drag, grip, grip loss in drift, steering max angle, steering speed falloff, nitro strength and duration, reverse top speed, and reverse acceleration.
 
 Reverse driving rules:
+
 - Reverse is derived without modifying `InputState`: when `brake > 0`, `throttle == 0` and forward speed <= 1 m/s, the car accelerates backward using `CarData.reverseAccel` capped at `CarData.reverseTopSpeed`. Otherwise, brake slows the car down to 0.
 - Speed is signed (positive forward, negative backward). If the car is moving backward and `throttle > 0`, braking force applies first, crossing zero into forward acceleration.
 - Steering uses signed speed so front wheels turn the chassis in reverse orientation; steering falloff is based on `abs(speed)`.
