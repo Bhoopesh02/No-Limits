@@ -186,4 +186,3 @@ export function buildCabinGlassGeometry(): THREE.BufferGeometry {
 
   return merged;
 }
-

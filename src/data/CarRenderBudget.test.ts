@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CAR_RENDER_BUDGETS, getCarDetailForTier } from './CarRenderBudget';
+import { CAR_RENDER_BUDGETS, getCarDetailForTier, getOpponentCarDetail } from './CarRenderBudget';
 
 describe('CarRenderBudget', () => {
   it('defines valid render budgets for low, medium, and high detail levels', () => {
@@ -27,5 +27,10 @@ describe('CarRenderBudget', () => {
     expect(getCarDetailForTier('medium')).toBe('medium');
     expect(getCarDetailForTier('high')).toBe('high');
   });
-});
 
+  it('computes opponent car detail one level below player detail', () => {
+    expect(getOpponentCarDetail('high')).toBe('medium');
+    expect(getOpponentCarDetail('medium')).toBe('low');
+    expect(getOpponentCarDetail('low')).toBe('low');
+  });
+});

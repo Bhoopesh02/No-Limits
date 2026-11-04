@@ -2,14 +2,27 @@ import { CarData, DEFAULT_CAR_KAZE } from '../../data/CarData';
 import { createButton } from '../components/Button';
 import { createSlider } from '../components/Slider';
 
+export interface AiTuningDevControls {
+  getAiPace: () => number;
+  setAiPace: (val: number) => void;
+  getRubberBandStrength: () => number;
+  setRubberBandStrength: (val: number) => void;
+}
+
 export class TuningPanel {
   private readonly container: HTMLElement;
   private readonly sliderListEl: HTMLElement;
   private readonly liveCarData: CarData;
+  private readonly aiDevControls?: AiTuningDevControls;
   private visible = false;
 
-  constructor(liveCarData: CarData, parent: HTMLElement = document.body) {
+  constructor(
+    liveCarData: CarData,
+    parent: HTMLElement = document.body,
+    aiDevControls?: AiTuningDevControls,
+  ) {
     this.liveCarData = liveCarData;
+    this.aiDevControls = aiDevControls;
 
     this.container = document.createElement('div');
     this.container.style.cssText = `
@@ -209,6 +222,35 @@ export class TuningPanel {
         },
       });
       this.sliderListEl.appendChild(slider);
+    }
+    if (this.aiDevControls) {
+      const aiHeader = document.createElement('div');
+      aiHeader.style.cssText =
+        'font-family: var(--font-display); font-weight: 700; font-size: var(--fs-14); color: var(--accent); margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--border);';
+      aiHeader.textContent = 'AI OPPONENTS';
+      this.sliderListEl.appendChild(aiHeader);
+
+      const aiPaceSlider = createSlider({
+        label: 'AI Pace',
+        value: this.aiDevControls.getAiPace(),
+        min: 0.8,
+        max: 1.1,
+        step: 0.02,
+        unit: 'x',
+        onChange: (v) => this.aiDevControls?.setAiPace(v),
+      });
+      this.sliderListEl.appendChild(aiPaceSlider);
+
+      const rubberBandSlider = createSlider({
+        label: 'Rubber-band Strength',
+        value: this.aiDevControls.getRubberBandStrength(),
+        min: 0.0,
+        max: 1.0,
+        step: 0.05,
+        unit: '',
+        onChange: (v) => this.aiDevControls?.setRubberBandStrength(v),
+      });
+      this.sliderListEl.appendChild(rubberBandSlider);
     }
   }
 

@@ -32,6 +32,7 @@ interface DevTools {
     memoryGeometries?: number,
     memoryTextures?: number,
   ): void;
+  recordSimStep?(durationMs: number): void;
 }
 
 /**
@@ -141,6 +142,8 @@ export class App {
       renderer: this.renderer,
       cameraRig: this.cameraRig,
       carView: this.carView,
+      carFactory: this.carFactory,
+      playerDetail: carDetail,
       bus: this.bus,
       isTouch: this.touchControls.isVisible(),
       onPauseStateChange: (paused) => {
@@ -165,7 +168,19 @@ export class App {
           ),
         );
         this.debugOverlay = overlay;
-        this.tuningPanel = new TuningPanel(DEFAULT_CAR_KAZE);
+        this.tuningPanel = new TuningPanel(DEFAULT_CAR_KAZE, document.body, {
+          getAiPace: () => this.gameFlow.getActiveRaceSession()?.aiPaceScale ?? 1.0,
+          setAiPace: (v) => {
+            const session = this.gameFlow.getActiveRaceSession();
+            if (session) session.aiPaceScale = v;
+          },
+          getRubberBandStrength: () =>
+            this.gameFlow.getActiveRaceSession()?.rubberBandStrength ?? 1.0,
+          setRubberBandStrength: (v) => {
+            const session = this.gameFlow.getActiveRaceSession();
+            if (session) session.rubberBandStrength = v;
+          },
+        });
       });
     }
 
@@ -257,8 +272,11 @@ export class App {
       return;
     }
 
+    const t0 = performance.now();
     const input = this.inputManager.poll();
     this.gameFlow.simulate(fixedDt, input);
+    const simDtMs = performance.now() - t0;
+    this.debugOverlay?.recordSimStep?.(simDtMs);
   };
 
   private readonly onRender = (alpha: number): void => {

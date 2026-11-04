@@ -2,11 +2,13 @@ import { StateMachine } from '../core/StateMachine';
 import type { EventBus, Unsubscribe } from '../core/EventBus';
 import type { GameEvents } from '../data/GameEvents';
 import { GAME_STATE_TRANSITIONS, GameState } from '../data/GameState';
+import type { CarDetailLevel } from '../data/CarRenderBudget';
 import type { InputState } from '../data/InputState';
 import type { RaceResult } from '../data/RaceResult';
 import { Spline } from '../race/Spline';
 import { AssetLoader } from '../render/AssetLoader';
 import type { CameraRig } from '../render/CameraRig';
+import type { CarFactory } from '../render/car/CarFactory';
 import type { CarView } from '../render/CarView';
 import type { Renderer } from '../render/Renderer';
 import type { TrackView } from '../render/TrackView';
@@ -23,6 +25,8 @@ export interface GameFlowOptions {
   readonly renderer: Renderer;
   readonly cameraRig: CameraRig;
   readonly carView: CarView;
+  readonly carFactory?: CarFactory;
+  readonly playerDetail?: CarDetailLevel;
   readonly bus: EventBus<GameEvents>;
   readonly isTouch: boolean;
   readonly onPauseStateChange?: (isPaused: boolean) => void;
@@ -33,6 +37,8 @@ export class GameFlow {
   private readonly renderer: Renderer;
   private readonly cameraRig: CameraRig;
   private readonly carView: CarView;
+  private readonly carFactory?: CarFactory;
+  private readonly playerDetail?: CarDetailLevel;
   private readonly bus: EventBus<GameEvents>;
   private readonly isTouch: boolean;
   private readonly onPauseStateChange?: (isPaused: boolean) => void;
@@ -52,6 +58,8 @@ export class GameFlow {
     this.renderer = options.renderer;
     this.cameraRig = options.cameraRig;
     this.carView = options.carView;
+    this.carFactory = options.carFactory;
+    this.playerDetail = options.playerDetail;
     this.bus = options.bus;
     this.isTouch = options.isTouch;
     this.onPauseStateChange = options.onPauseStateChange;
@@ -134,6 +142,10 @@ export class GameFlow {
     return this.raceSession?.getTrackView() ?? null;
   }
 
+  public getActiveRaceSession(): RaceSession | null {
+    return this.raceSession;
+  }
+
   public isPaused(): boolean {
     return this.pauseOverlay.isOpen();
   }
@@ -194,6 +206,8 @@ export class GameFlow {
           renderer: this.renderer,
           cameraRig: this.cameraRig,
           carView: this.carView,
+          carFactory: this.carFactory,
+          playerDetail: this.playerDetail,
           trackData: assets.trackData,
           carData: assets.carData,
           spline: assets.spline as Spline,

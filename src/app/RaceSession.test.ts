@@ -4,6 +4,7 @@ import { DEFAULT_CAR_KAZE } from '../data/CarData';
 import type { GameEvents } from '../data/GameEvents';
 import { TrackData } from '../data/TrackData';
 import { Spline } from '../race/Spline';
+import { CarFactory } from '../render/car/CarFactory';
 import { RaceSession } from './RaceSession';
 
 interface MockElement {
@@ -122,12 +123,16 @@ describe('RaceSession lifecycle and disposal', () => {
     const bus = new EventBus<GameEvents>();
     const spline = new Spline(dummyTrackData.controlPoints, 1.0);
 
+    const carFactory = new CarFactory();
+
     // Simulate 5 restarts
     for (let i = 0; i < 5; i++) {
       const session = new RaceSession({
         renderer: mockRenderer as never,
         cameraRig: mockCameraRig as never,
         carView: mockCarView as never,
+        carFactory,
+        playerDetail: 'medium',
         trackData: dummyTrackData,
         carData: DEFAULT_CAR_KAZE,
         spline,
@@ -138,10 +143,15 @@ describe('RaceSession lifecycle and disposal', () => {
       });
 
       expect(sceneChildren).toContain(mockTrackView.group);
+      // 1 track view + 5 opponent car views
+      expect(sceneChildren.length).toBe(6);
+
       session.dispose();
       expect(sceneChildren).not.toContain(mockTrackView.group);
+      expect(sceneChildren.length).toBe(0);
     }
 
+    carFactory.dispose();
     expect(trackViewDisposedCount).toBe(5);
   });
 });

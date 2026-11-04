@@ -31,6 +31,7 @@ export class LapTimer {
   private lastLapTimeMs: number | null = null;
   private bestLapTimeMs: number | null = null;
   private isFinished = false;
+  private readonly lapTimesMs: number[] = [];
 
   private lastDistance: number | null = null;
   private distanceTraveledThisLap = 0;
@@ -47,6 +48,7 @@ export class LapTimer {
     this.lastLapTimeMs = null;
     this.bestLapTimeMs = null;
     this.isFinished = false;
+    this.lapTimesMs.length = 0;
     this.lastDistance = startingDistance;
     this.distanceTraveledThisLap = 0;
     this.checkpoints.reset(startingDistance);
@@ -94,6 +96,7 @@ export class LapTimer {
       const minLapDistance = L * 0.45;
       if (this.distanceTraveledThisLap >= minLapDistance) {
         this.lastLapTimeMs = this.currentLapTimeMs;
+        this.lapTimesMs.push(this.lastLapTimeMs);
         if (this.bestLapTimeMs === null || this.lastLapTimeMs < this.bestLapTimeMs) {
           this.bestLapTimeMs = this.lastLapTimeMs;
         }
@@ -110,6 +113,14 @@ export class LapTimer {
     }
 
     return false;
+  }
+
+  public getLapTimes(): readonly number[] {
+    return this.lapTimesMs;
+  }
+
+  public hasFinished(): boolean {
+    return this.isFinished;
   }
 
   public getState(): LapTimerState {

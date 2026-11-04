@@ -113,14 +113,77 @@ describe('CarFactory', () => {
       }
     });
 
-    // In Node headless environment, procedural textures are null, but if any texture exists it must be identical
-    for (const tex of textures1) {
-      expect(textures2.has(tex)).toBe(true);
-    }
+    // In Node headless environment, procedural textures are null
+    expect(textures1.size).toBe(0);
 
     carHigh1.dispose();
     carHigh2.dispose();
     factory.dispose();
+
+    // Browser simulation with mock document.createElement('canvas')
+    const mockCanvas = {
+      width: 0,
+      height: 0,
+      getContext: () => ({
+        fillStyle: '',
+        strokeStyle: '',
+        lineWidth: 1,
+        fillRect: () => {},
+        beginPath: () => {},
+        arc: () => {},
+        stroke: () => {},
+        fill: () => {},
+        moveTo: () => {},
+        lineTo: () => {},
+        closePath: () => {},
+      }),
+    };
+    const origDoc = globalThis.document;
+    (globalThis as unknown as { document: unknown }).document = {
+      createElement: (tag: string) => (tag === 'canvas' ? mockCanvas : {}),
+    };
+
+    try {
+      const browserFactory = new CarFactory();
+      const bHigh1 = browserFactory.create('high');
+      const bHigh2 = browserFactory.create('high');
+
+      const bTex1 = new Set<THREE.Texture>();
+      const bTex2 = new Set<THREE.Texture>();
+
+      bHigh1.root.traverse((obj) => {
+        if (obj instanceof THREE.Mesh && obj.material) {
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          for (const m of mats) {
+            const std = m as THREE.MeshStandardMaterial;
+            if (std.map) bTex1.add(std.map);
+          }
+        }
+      });
+
+      bHigh2.root.traverse((obj) => {
+        if (obj instanceof THREE.Mesh && obj.material) {
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          for (const m of mats) {
+            const std = m as THREE.MeshStandardMaterial;
+            if (std.map) bTex2.add(std.map);
+          }
+        }
+      });
+
+      // High in browser has 3 textures: carbonFiber (aero), hexGrille (grille), brakeDisc (wheels)
+      expect(bTex1.size).toBe(3);
+      expect(bTex2.size).toBe(3);
+      for (const tex of bTex1) {
+        expect(bTex2.has(tex)).toBe(true);
+      }
+
+      bHigh1.dispose();
+      bHigh2.dispose();
+      browserFactory.dispose();
+    } finally {
+      (globalThis as unknown as { document: unknown }).document = origDoc;
+    }
   });
 
   it('shares geometries and materials across two instances except for cloned body paint', () => {

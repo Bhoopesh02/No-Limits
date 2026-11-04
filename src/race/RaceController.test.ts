@@ -130,6 +130,63 @@ describe('RaceController', () => {
     }
   });
 
+  it('stores final position and classification list when player finishes', () => {
+    const bus = new EventBus<GameEvents>();
+    let emittedResult: unknown = null;
+    bus.on('race:finished', (res) => {
+      emittedResult = res;
+    });
+
+    const controller = new RaceController({
+      trackLength,
+      totalLaps: 1,
+      checkpointCount: 4,
+      stepsPerCountdownTick: 5,
+      bus,
+    });
+
+    // Countdown
+    for (let s = 0; s < 15; s++) controller.update(0, fixedDt);
+
+    const mockClassification = [
+      {
+        position: 1,
+        driverName: 'Apex Hunter',
+        isPlayer: false,
+        finished: true,
+        totalTimeMs: 45000,
+        gapMeters: 0,
+        formattedTimeOrGap: '0:45.000',
+      },
+      {
+        position: 2,
+        driverName: 'Player',
+        isPlayer: true,
+        finished: true,
+        totalTimeMs: 46200,
+        gapMeters: 45,
+        formattedTimeOrGap: '0:46.200',
+      },
+    ];
+
+    // Drive 1 full lap forward smoothly
+    const stepDist = 20 * fixedDt;
+    let dist = 0;
+    for (let s = 0; s < 3000; s++) {
+      dist = (dist + stepDist) % trackLength;
+      controller.update(dist, fixedDt, 2, mockClassification);
+      if (controller.getPhase() === 'Finished') break;
+    }
+
+    expect(controller.getPhase()).toBe('Finished');
+    const result = controller.getResult();
+    expect(result).not.toBeNull();
+    expect(result?.position).toBe(2);
+    expect(result?.totalRacers).toBe(2);
+    expect(result?.classification).toEqual(mockClassification);
+    expect(emittedResult).toEqual(result);
+  });
+
   it('guarantees determinism over thousands of steps', () => {
     const runSimulation = () => {
       const controller = new RaceController({

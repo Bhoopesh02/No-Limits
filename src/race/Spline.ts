@@ -1,4 +1,5 @@
 import { TrackControlPoint } from '../data/TrackData';
+import type { TrackSample, TrackSampler } from '../data/TrackSampler';
 import {
   createEmptySplineProjection,
   createEmptySplineSample,
@@ -7,7 +8,7 @@ import {
   TrackSpline,
 } from '../data/TrackSpline';
 
-export type { SplineProjection, SplineSample, TrackSpline };
+export type { SplineProjection, SplineSample, TrackSpline, TrackSampler, TrackSample };
 export { createEmptySplineProjection, createEmptySplineSample };
 
 /**
@@ -20,8 +21,9 @@ export { createEmptySplineProjection, createEmptySplineSample };
  * - Negative lateral offset (d < 0) is to the LEFT of the track centerline.
  * - Road edges sit at +/- (width / 2).
  */
-export class Spline implements TrackSpline {
-  private readonly totalLength: number;
+export class Spline implements TrackSpline, TrackSampler {
+  public readonly totalLength: number;
+  public readonly closed = true;
   private readonly sampleCount: number;
   private readonly stepSize: number;
 

@@ -52,3 +52,13 @@ export function getCarDetailForTier(tierId: 'low' | 'medium' | 'high'): CarDetai
   }
 }
 
+/**
+ * Returns the opponent car detail level, set one tier below the player car
+ * (low at minimum) to preserve frame rate when multiple cars are on screen.
+ */
+export function getOpponentCarDetail(playerDetail: CarDetailLevel): CarDetailLevel {
+  if (playerDetail === 'high') {
+    return 'medium';
+  }
+  return 'low';
+}

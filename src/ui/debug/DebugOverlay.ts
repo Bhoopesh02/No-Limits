@@ -30,6 +30,7 @@ export class DebugOverlay {
   private lastFpsTime = performance.now();
   private currentFps = 60;
   private currentFrameTime = 16.6;
+  private avgSimStepTimeMs = 0.5;
 
   constructor(options: DebugOverlayOptions = {}) {
     const parent = options.parent ?? document.body;
@@ -74,6 +75,10 @@ export class DebugOverlay {
     window.addEventListener('keydown', this.onKeyDown);
   }
 
+  public recordSimStep(durationMs: number): void {
+    this.avgSimStepTimeMs = this.avgSimStepTimeMs * 0.95 + durationMs * 0.05;
+  }
+
   public setAuditProvider(provider: () => DebugAuditData): void {
     this.auditProvider = provider;
   }
@@ -104,7 +109,7 @@ export class DebugOverlay {
 
       this.liveStatsEl.innerHTML = `
         <div style="color: var(--accent); font-weight: 700; margin-bottom: 2px;">DEV STATS [\`]</div>
-        <div>FPS: <strong style="color: var(--text-primary);">${this.currentFps}</strong> (${this.currentFrameTime.toFixed(1)}ms)</div>
+        <div>FPS: <strong style="color: var(--text-primary);">${this.currentFps}</strong> (${this.currentFrameTime.toFixed(1)}ms) | Sim: <strong style="color: var(--text-primary);">${this.avgSimStepTimeMs.toFixed(2)}ms</strong></div>
         <div>Calls: <strong style="color: var(--text-primary);">${calls}</strong> | Tris: <strong style="color: var(--text-primary);">${triangles.toLocaleString()}</strong></div>
         ${memHtml}
       `;

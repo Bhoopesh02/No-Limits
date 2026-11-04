@@ -135,4 +135,3 @@ export function createCarTextures(detail: CarDetailLevel): CarTextures {
     },
   };
 }
-

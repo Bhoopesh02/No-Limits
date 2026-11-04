@@ -1,7 +1,7 @@
 import type { EventBus } from '../core/EventBus';
 import type { GameEvents } from '../data/GameEvents';
 import { createInputState, InputState } from '../data/InputState';
-import type { RacePhase, RaceResult } from '../data/RaceResult';
+import type { ClassificationEntry, RacePhase, RaceResult } from '../data/RaceResult';
 import { LapTimer } from './LapTimer';
 
 export const COUNTDOWN_STEPS_PER_TICK = 60; // 60 steps at 60 Hz = 1.0 second per tick
@@ -116,7 +116,12 @@ export class RaceController {
     return rawInput;
   }
 
-  public update(distanceAlongTrack: number, fixedDt: number): void {
+  public update(
+    distanceAlongTrack: number,
+    fixedDt: number,
+    playerPosition = 1,
+    classification: readonly ClassificationEntry[] = [],
+  ): void {
     if (this.phase === 'Countdown') {
       const tick = Math.floor(this.countdownSteps / this.stepsPerTick);
       const currentTickValue: number = tick === 0 ? 3 : tick === 1 ? 2 : 1;
@@ -164,7 +169,9 @@ export class RaceController {
             lapTimesMs: [...this.lapTimesMs],
             bestLapTimeMs: state.bestLapTimeMs ?? totalTimeMs,
             lapsCompleted: state.totalLaps,
-            position: 1,
+            position: playerPosition,
+            totalRacers: classification.length > 0 ? classification.length : 6,
+            classification,
           };
 
           this.bus?.emit('race:phase', { phase: 'Finished', previous: prevPhase });

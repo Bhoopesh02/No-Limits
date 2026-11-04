@@ -153,4 +153,3 @@ export function buildCarInterior(detail: CarDetailLevel): CarInteriorResult {
     },
   };
 }
-
