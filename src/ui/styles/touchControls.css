@@ -30,7 +30,12 @@
   display: none !important;
 }
 
-/* Left cluster: Steering buttons */
+/* Layout inversion: Steering on Right, Pedals on Left */
+.nl-touch-controls.is-steer-right {
+  flex-direction: row-reverse;
+}
+
+/* Left cluster: Steering buttons (or Pedals when inverted) */
 .nl-touch-cluster--left {
   display: flex;
   align-items: flex-end;
@@ -39,7 +44,29 @@
   touch-action: none;
 }
 
-/* Right cluster: Throttle, Brake, Nitro, Drift */
+.nl-touch-group--steer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+/* Nitro and Drift positioned with Steering buttons */
+.nl-touch-controls.is-nitro-with-steer .nl-touch-cluster--left {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.nl-touch-controls.is-steer-right.is-nitro-with-steer .nl-touch-cluster--left {
+  align-items: flex-end;
+}
+
+.nl-touch-controls.is-nitro-with-steer .nl-touch-cluster--left .nl-touch-group--aux {
+  flex-direction: row;
+  gap: var(--space-2);
+}
+
+/* Right cluster: Throttle, Brake, Nitro, Drift (or Steer when inverted) */
 .nl-touch-cluster--right {
   display: flex;
   align-items: flex-end;
@@ -168,8 +195,11 @@
 }
 
 /* --------------------------------------------------------------------------
-   HUD Top Corner Relocation when Touch Controls are Active
-   Speedometer & Nitro gauge move to top corners so they don't sit under buttons
+   HUD Mobile Layout when Touch Controls are Active
+   - Top-left: Pause button + horizontal Position & Lap badges
+   - Top-center: Lap timer (compact)
+   - Center below top bar: Drift score HUD
+   - Top-right: Speedometer with Nitro gauge neatly stacked underneath
    -------------------------------------------------------------------------- */
 .hud-root.has-touch-controls .hud-desktop-bar {
   display: none !important;
@@ -182,17 +212,94 @@
   width: 100%;
 }
 
-.hud-root.has-touch-controls .nl-hud-nitro {
-  order: 1;
-  width: 150px;
+.hud-root.has-touch-controls .nl-hud-mobile-pills {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  pointer-events: auto;
 }
 
-.hud-root.has-touch-controls .nl-hud-drift {
-  order: 2;
+.hud-root.has-touch-controls .hud-mobile-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  pointer-events: none;
 }
 
 .hud-root.has-touch-controls .nl-hud-speedometer {
-  order: 3;
+  align-items: flex-end;
+}
+
+.hud-root.has-touch-controls .nl-hud-speedometer__value {
+  font-size: clamp(28px, 5.5vw, 36px);
+}
+
+.hud-root.has-touch-controls .nl-hud-speedometer__unit {
+  font-size: var(--fs-12);
+}
+
+.hud-root.has-touch-controls .nl-hud-nitro {
+  width: clamp(120px, 18vw, 150px);
+}
+
+.hud-root.has-touch-controls .nl-hud-nitro__bar {
+  height: 6px;
+}
+
+.hud-root.has-touch-controls .nl-hud-nitro__header {
+  margin-bottom: 2px;
+}
+
+.hud-root.has-touch-controls .nl-hud-nitro__title {
+  font-size: 10px;
+}
+
+.hud-root.has-touch-controls .nl-hud-nitro__value {
+  font-size: 11px;
+}
+
+.hud-root.has-touch-controls .nl-hud-lap-timer {
+  padding: var(--space-1) var(--space-2);
+  min-width: 105px;
+}
+
+.hud-root.has-touch-controls .nl-hud-lap-timer__row {
+  gap: var(--space-2);
+}
+
+.hud-root.has-touch-controls .nl-hud-lap-timer__label {
+  font-size: 11px;
+}
+
+.hud-root.has-touch-controls .nl-hud-lap-timer__value {
+  font-size: 13px;
+}
+
+.hud-root.has-touch-controls .nl-hud-badge {
+  padding: 3px var(--space-2);
+  gap: 4px;
+}
+
+.hud-root.has-touch-controls .nl-hud-badge__label {
+  font-size: 11px;
+}
+
+.hud-root.has-touch-controls .nl-hud-badge__value {
+  font-size: 16px;
+}
+
+.hud-root.has-touch-controls .nl-hud-badge__total {
+  font-size: 11px;
+}
+
+.hud-root.has-touch-controls .nl-hud-drift {
+  position: absolute;
+  top: calc(max(var(--space-3), env(safe-area-inset-top, 0px)) + 46px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
 }
 
 /* --------------------------------------------------------------------------

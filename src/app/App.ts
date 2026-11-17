@@ -83,7 +83,10 @@ export class App {
       initialSfx: this.settingsService.get('sfxVolume'),
       initialMusic: this.settingsService.get('musicVolume'),
     });
-    this.settingsService.subscribe((s) => this.audioEngine.syncVolumes(s));
+    this.settingsService.subscribe((s) => {
+      this.audioEngine.syncVolumes(s);
+      this.touchControls?.setLayout(s.touchSteerSide, s.touchNitroSide);
+    });
     this.graphicsService = new GraphicsService({
       bus: this.bus,
       defaultTier: this.settingsService.get('graphicsTier'),
@@ -129,6 +132,10 @@ export class App {
     if (!uiRoot) throw new Error(`Element #${uiRootId} not found.`);
 
     this.touchControls = createTouchControls(this.touchState);
+    this.touchControls.setLayout(
+      this.settingsService.get('touchSteerSide'),
+      this.settingsService.get('touchNitroSide'),
+    );
     this.touchControls.style.display = 'none';
     uiRoot.appendChild(this.touchControls);
 

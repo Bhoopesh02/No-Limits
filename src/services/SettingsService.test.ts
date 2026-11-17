@@ -66,6 +66,8 @@ describe('SettingsService', () => {
         resolutionScale: 2.5,
         masterVolume: 200,
         speedUnits: 'knots',
+        touchSteerSide: 'upside-down',
+        touchNitroSide: 'space',
       }),
     );
 
@@ -74,6 +76,8 @@ describe('SettingsService', () => {
     expect(service.get('resolutionScale')).toBe(1.0);
     expect(service.get('masterVolume')).toBe(100);
     expect(service.get('speedUnits')).toBe('kmh');
+    expect(service.get('touchSteerSide')).toBe('left');
+    expect(service.get('touchNitroSide')).toBe('pedals');
   });
 
   it('updates settings and persists to storage', () => {

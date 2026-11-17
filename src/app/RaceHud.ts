@@ -10,6 +10,7 @@ export interface RaceHudOptions {
   readonly isTouch: boolean;
   readonly totalLaps: number;
   readonly totalRacers: number;
+  readonly onPause?: () => void;
 }
 
 export interface RaceHudUpdateParams {
@@ -31,8 +32,11 @@ export interface RaceHudUpdateParams {
 }
 
 /**
- * Encapsulates the 2D HTML/CSS in-race HUD overlay:
- * Position badge, Lap counter, Lap timer, Drift score, Nitro gauge, Speedometer, and Countdown.
+ * In-race 2D HUD overlay.
+ * Adapts responsively between desktop and touch/mobile layouts:
+ * - Desktop: corner-anchored gauges, control banner, and bottom speedometer/nitro.
+ * - Mobile: ergonomic top-row layout (pause button, horizontal position/lap pills,
+ *   centered lap timer, compact top-right speed/nitro cluster) leaving the bottom clear for touch controls.
  */
 export class RaceHud {
   private readonly hudContainer: HTMLElement;
@@ -41,6 +45,9 @@ export class RaceHud {
   private readonly topBar: HTMLElement;
   private readonly countdownEl: HTMLElement;
   private readonly lapGroup: HTMLElement;
+  private readonly mobilePillsGroup: HTMLElement;
+  private readonly mobileActionsGroup: HTMLElement;
+  private readonly pauseBtn: HTMLButtonElement;
 
   private readonly speedometer: SpeedometerElement;
   private readonly nitroGauge: NitroGaugeElement;
@@ -48,8 +55,11 @@ export class RaceHud {
   private readonly lapBadge: LapBadgeElement;
   private readonly positionBadge: PositionBadgeElement;
   private readonly lapTimerHud: LapTimerHUDElement;
+  private readonly onPauseCallback?: () => void;
 
   constructor(options: RaceHudOptions) {
+    this.onPauseCallback = options.onPause;
+
     this.hudContainer = document.createElement('div');
     this.hudContainer.className = 'hud-root';
     this.hudContainer.style.cssText = `
@@ -59,9 +69,9 @@ export class RaceHud {
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: max(var(--space-4), env(safe-area-inset-top, 0px))
+      padding: max(var(--space-3), env(safe-area-inset-top, 0px))
         max(var(--space-4), env(safe-area-inset-right, 0px))
-        max(var(--space-4), env(safe-area-inset-bottom, 0px))
+        max(var(--space-3), env(safe-area-inset-bottom, 0px))
         max(var(--space-4), env(safe-area-inset-left, 0px));
       box-sizing: border-box;
       z-index: 15;
@@ -79,11 +89,32 @@ export class RaceHud {
     this.lapBadge = createLapBadge({ currentLap: 1, totalLaps: options.totalLaps });
     this.lapTimerHud = createLapTimerHUD();
 
+    // Desktop lap group (vertical stack)
     this.lapGroup = document.createElement('div');
     this.lapGroup.className = 'nl-hud-group--lap';
-    this.lapGroup.appendChild(this.positionBadge.element);
-    this.lapGroup.appendChild(this.lapBadge.element);
-    this.lapGroup.appendChild(this.lapTimerHud.element);
+
+    // Mobile pause button
+    this.pauseBtn = document.createElement('button');
+    this.pauseBtn.type = 'button';
+    this.pauseBtn.className = 'nl-hud-pause-btn';
+    this.pauseBtn.setAttribute('aria-label', 'Pause Race');
+    this.pauseBtn.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <rect x="6" y="4" width="4" height="16" rx="1"/>
+        <rect x="14" y="4" width="4" height="16" rx="1"/>
+      </svg>
+    `;
+    if (typeof this.pauseBtn.addEventListener === 'function') {
+      this.pauseBtn.addEventListener('click', this.handlePauseClick);
+    }
+
+    // Mobile horizontal pill container (Pause + Position + Lap)
+    this.mobilePillsGroup = document.createElement('div');
+    this.mobilePillsGroup.className = 'nl-hud-mobile-pills';
+
+    // Mobile right container (Speedometer + Nitro Gauge stacked vertically)
+    this.mobileActionsGroup = document.createElement('div');
+    this.mobileActionsGroup.className = 'hud-mobile-actions';
 
     this.topBar = document.createElement('div');
     this.topBar.className = 'hud-desktop-bar';
@@ -129,28 +160,55 @@ export class RaceHud {
   public layout(isTouch: boolean): void {
     if (isTouch) {
       this.hudContainer.classList.add('has-touch-controls');
-      this.topRow.innerHTML = '';
-      this.topRow.appendChild(this.lapGroup);
-      this.topRow.appendChild(this.driftHud);
 
-      const topActionsGroup = document.createElement('div');
-      topActionsGroup.style.cssText =
-        'display: flex; gap: var(--space-3); align-items: flex-start;';
-      topActionsGroup.appendChild(this.nitroGauge);
-      topActionsGroup.appendChild(this.speedometer);
-      this.topRow.appendChild(topActionsGroup);
+      // 1. Mobile top-left: Pause button + Position + Lap in a horizontal row
+      this.mobilePillsGroup.innerHTML = '';
+      this.mobilePillsGroup.appendChild(this.pauseBtn);
+      this.mobilePillsGroup.appendChild(this.positionBadge.element);
+      this.mobilePillsGroup.appendChild(this.lapBadge.element);
+
+      // 2. Mobile top-right: Speedometer on top, Nitro gauge directly below
+      this.mobileActionsGroup.innerHTML = '';
+      this.mobileActionsGroup.appendChild(this.speedometer);
+      this.mobileActionsGroup.appendChild(this.nitroGauge);
+
+      // 3. Assemble mobile top row
+      this.topRow.innerHTML = '';
+      this.topRow.appendChild(this.mobilePillsGroup);
+      this.topRow.appendChild(this.lapTimerHud.element);
+      this.topRow.appendChild(this.mobileActionsGroup);
+
+      // 4. Center Drift HUD
+      if (!this.hudContainer.contains(this.driftHud)) {
+        this.hudContainer.appendChild(this.driftHud);
+      }
+
+      this.pauseBtn.style.display = 'inline-flex';
       this.bottomRow.style.display = 'none';
+      this.topBar.style.display = 'none';
     } else {
       this.hudContainer.classList.remove('has-touch-controls');
+
+      // 1. Desktop top-left: Lap group (Position + Lap + Timer stacked)
+      this.lapGroup.innerHTML = '';
+      this.lapGroup.appendChild(this.positionBadge.element);
+      this.lapGroup.appendChild(this.lapBadge.element);
+      this.lapGroup.appendChild(this.lapTimerHud.element);
+
+      // 2. Desktop top row: Lap group (left), Drift HUD (center), Top bar (right)
       this.topRow.innerHTML = '';
       this.topRow.appendChild(this.lapGroup);
       this.topRow.appendChild(this.driftHud);
       this.topRow.appendChild(this.topBar);
 
-      this.bottomRow.style.display = 'flex';
+      // 3. Desktop bottom row: Nitro gauge (left), Speedometer (right)
       this.bottomRow.innerHTML = '';
       this.bottomRow.appendChild(this.nitroGauge);
       this.bottomRow.appendChild(this.speedometer);
+
+      this.pauseBtn.style.display = 'none';
+      this.bottomRow.style.display = 'flex';
+      this.topBar.style.display = 'flex';
     }
   }
 
@@ -187,6 +245,15 @@ export class RaceHud {
   }
 
   public dispose(): void {
+    if (typeof this.pauseBtn.removeEventListener === 'function') {
+      this.pauseBtn.removeEventListener('click', this.handlePauseClick);
+    }
     this.hudContainer.remove();
   }
+
+  private readonly handlePauseClick = (e: MouseEvent): void => {
+    e.stopPropagation();
+    e.preventDefault();
+    this.onPauseCallback?.();
+  };
 }

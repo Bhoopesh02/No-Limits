@@ -138,28 +138,25 @@ export class GameFlow {
 
     // 5. Pause overlay
     this.pauseOverlay = new PauseOverlay({
-      onResume: () => {
-        this.onPauseStateChange?.(false);
-      },
+      onResume: () => this.onPauseStateChange?.(false),
       onRestart: () => {
         this.onPauseStateChange?.(false);
         this.transitionTo('Loading');
       },
-      onSettings: () => {
-        this.settingsScreen?.open();
-      },
+      onSettings: () => this.settingsScreen?.open(),
       onQuit: () => {
         this.onPauseStateChange?.(false);
         this.transitionTo('Menu');
       },
     });
 
-    // 5. Listen to race finish
+    // 6. Listen to race events
     this.unsubs.push(
       this.bus.on('race:finished', (result: RaceResult) => {
         this.resultsScreen.setResult(result);
         this.transitionTo('Results');
       }),
+      this.bus.on('race:pause', () => this.togglePause()),
     );
   }
 

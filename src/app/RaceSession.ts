@@ -167,6 +167,7 @@ export class RaceSession {
       isTouch: options.isTouch,
       totalLaps: this.trackData.laps,
       totalRacers: this.totalRacers,
+      onPause: () => options.bus.emit('race:pause', true),
     });
 
     this.resetCarsToGrid(slots);

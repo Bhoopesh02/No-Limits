@@ -3,6 +3,8 @@ import type { GraphicsTierOption } from '../data/GraphicsTierConfig';
 
 export type ControlSchemeSetting = 'auto' | 'keyboard' | 'touch' | 'gamepad';
 export type SpeedUnitSetting = 'kmh' | 'mph';
+export type TouchSteerSide = 'left' | 'right';
+export type TouchNitroSide = 'pedals' | 'steer';
 
 export interface UserSettings {
   readonly graphicsTier: GraphicsTierOption;
@@ -12,6 +14,8 @@ export interface UserSettings {
   readonly musicVolume: number;
   readonly controlScheme: ControlSchemeSetting;
   readonly steeringSensitivity: number;
+  readonly touchSteerSide: TouchSteerSide;
+  readonly touchNitroSide: TouchNitroSide;
   readonly reduceMotion: boolean;
   readonly speedUnits: SpeedUnitSetting;
   readonly showDevStats: boolean;
@@ -25,6 +29,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   musicVolume: 75,
   controlScheme: 'auto',
   steeringSensitivity: 1.0,
+  touchSteerSide: 'left',
+  touchNitroSide: 'pedals',
   reduceMotion: false,
   speedUnits: 'kmh',
   showDevStats: false,
@@ -115,6 +121,9 @@ export class SettingsService {
     const validUnits: SpeedUnitSetting[] = ['kmh', 'mph'];
     const speedUnits = validUnits.includes(s.speedUnits) ? s.speedUnits : 'kmh';
 
+    const touchSteerSide: TouchSteerSide = s.touchSteerSide === 'right' ? 'right' : 'left';
+    const touchNitroSide: TouchNitroSide = s.touchNitroSide === 'steer' ? 'steer' : 'pedals';
+
     return {
       graphicsTier,
       resolutionScale: clamp(s.resolutionScale, 0.6, 1.0),
@@ -123,6 +132,8 @@ export class SettingsService {
       musicVolume: Math.round(clamp(s.musicVolume, 0, 100)),
       controlScheme,
       steeringSensitivity: clamp(s.steeringSensitivity, 0.5, 1.5),
+      touchSteerSide,
+      touchNitroSide,
       reduceMotion: Boolean(s.reduceMotion),
       speedUnits,
       showDevStats: Boolean(s.showDevStats),

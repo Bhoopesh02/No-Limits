@@ -3,6 +3,7 @@ import { TouchControlState } from '../../data/TouchControlState';
 export interface TouchControlsElement extends HTMLElement {
   setVisible(visible: boolean): void;
   isVisible(): boolean;
+  setLayout(steerSide: 'left' | 'right', nitroSide: 'pedals' | 'steer'): void;
   dispose(): void;
 }
 
@@ -54,10 +55,7 @@ function createTouchButton(config: TouchButtonConfig): {
   btn.className = `nl-touch-btn ${config.className}`;
   btn.setAttribute('aria-label', config.ariaLabel);
 
-  btn.innerHTML = `
-    <span class="nl-touch-btn__icon" aria-hidden="true">${config.iconSvg}</span>
-    <span class="nl-touch-btn__label" aria-hidden="true">${config.labelText}</span>
-  `;
+  btn.innerHTML = `<span class="nl-touch-btn__icon" aria-hidden="true">${config.iconSvg}</span><span class="nl-touch-btn__label" aria-hidden="true">${config.labelText}</span>`;
 
   let activePointerId: number | null = null;
 
@@ -91,47 +89,37 @@ function createTouchButton(config: TouchButtonConfig): {
   };
 
   const handlePointerUp = (e: PointerEvent) => {
-    if (e.pointerId === activePointerId) {
-      release();
-    }
+    if (e.pointerId === activePointerId) release();
   };
 
   const handlePointerMove = (e: PointerEvent) => {
     if (e.pointerId === activePointerId) {
-      // Release button immediately if the player slides their finger outside bounds
       const rect = btn.getBoundingClientRect();
-      const isInside = isPointInBounds(e.clientX, e.clientY, rect);
-      if (!isInside) {
-        release();
-      }
+      if (!isPointInBounds(e.clientX, e.clientY, rect)) release();
     }
   };
 
   const handleCancel = (e: PointerEvent) => {
-    if (e.pointerId === activePointerId) {
-      release();
-    }
+    if (e.pointerId === activePointerId) release();
   };
 
   const handleContextMenu = (e: MouseEvent) => {
     e.preventDefault();
   };
 
-  btn.addEventListener('pointerdown', handlePointerDown);
-  btn.addEventListener('pointerup', handlePointerUp);
-  btn.addEventListener('pointermove', handlePointerMove);
-  btn.addEventListener('pointercancel', handleCancel);
-  btn.addEventListener('lostpointercapture', handleCancel);
-  btn.addEventListener('contextmenu', handleContextMenu);
+  const events: [string, EventListener][] = [
+    ['pointerdown', handlePointerDown as EventListener],
+    ['pointerup', handlePointerUp as EventListener],
+    ['pointermove', handlePointerMove as EventListener],
+    ['pointercancel', handleCancel as EventListener],
+    ['lostpointercapture', handleCancel as EventListener],
+    ['contextmenu', handleContextMenu as EventListener],
+  ];
+  for (const [ev, h] of events) btn.addEventListener(ev, h);
 
   const cleanup = () => {
     release();
-    btn.removeEventListener('pointerdown', handlePointerDown);
-    btn.removeEventListener('pointerup', handlePointerUp);
-    btn.removeEventListener('pointermove', handlePointerMove);
-    btn.removeEventListener('pointercancel', handleCancel);
-    btn.removeEventListener('lostpointercapture', handleCancel);
-    btn.removeEventListener('contextmenu', handleContextMenu);
+    for (const [ev, h] of events) btn.removeEventListener(ev, h);
   };
 
   return { btn, cleanup };
@@ -147,6 +135,9 @@ export function createTouchControls(state: TouchControlState): TouchControlsElem
   const leftCluster = document.createElement('div');
   leftCluster.className = 'nl-touch-cluster--left';
 
+  const steerGroup = document.createElement('div');
+  steerGroup.className = 'nl-touch-group--steer';
+
   const steerLeft = createTouchButton({
     className: 'nl-touch-btn--steer',
     ariaLabel: 'Steer Left',
@@ -160,7 +151,7 @@ export function createTouchControls(state: TouchControlState): TouchControlsElem
     },
   });
   cleanups.push(steerLeft.cleanup);
-  leftCluster.appendChild(steerLeft.btn);
+  steerGroup.appendChild(steerLeft.btn);
 
   const steerRight = createTouchButton({
     className: 'nl-touch-btn--steer',
@@ -175,8 +166,9 @@ export function createTouchControls(state: TouchControlState): TouchControlsElem
     },
   });
   cleanups.push(steerRight.cleanup);
-  leftCluster.appendChild(steerRight.btn);
+  steerGroup.appendChild(steerRight.btn);
 
+  leftCluster.appendChild(steerGroup);
   container.appendChild(leftCluster);
 
   // 2. Right Cluster: Nitro & Handbrake, Brake & Throttle
@@ -252,7 +244,6 @@ export function createTouchControls(state: TouchControlState): TouchControlsElem
   pedalGroup.appendChild(throttleBtn.btn);
 
   rightCluster.appendChild(pedalGroup);
-
   container.appendChild(rightCluster);
 
   container.setVisible = (visible: boolean) => {
@@ -260,6 +251,22 @@ export function createTouchControls(state: TouchControlState): TouchControlsElem
   };
 
   container.isVisible = () => !container.classList.contains('is-hidden');
+
+  container.setLayout = (steerSide: 'left' | 'right', nitroSide: 'pedals' | 'steer') => {
+    container.classList.toggle('is-steer-right', steerSide === 'right');
+    const isNitroWithSteer = nitroSide === 'steer';
+    container.classList.toggle('is-nitro-with-steer', isNitroWithSteer);
+
+    if (isNitroWithSteer) {
+      if (auxGroup.parentElement !== leftCluster) {
+        leftCluster.insertBefore(auxGroup, steerGroup);
+      }
+    } else {
+      if (auxGroup.parentElement !== rightCluster) {
+        rightCluster.insertBefore(auxGroup, pedalGroup);
+      }
+    }
+  };
 
   container.dispose = () => {
     for (let i = 0; i < cleanups.length; i++) {
@@ -271,7 +278,6 @@ export function createTouchControls(state: TouchControlState): TouchControlsElem
     }
   };
 
-  // Initial visibility check
   container.setVisible(shouldShowTouchControls());
 
   return container;

@@ -165,43 +165,24 @@ export class SettingsScreen {
       'display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-2) 0;';
 
     const s = this.settingsService.getSettings();
-
-    panel.appendChild(
-      createSlider({
-        label: 'Master Volume',
-        value: s.masterVolume,
-        min: 0,
-        max: 100,
-        step: 5,
-        unit: '%',
-        onChange: (val) => this.settingsService.update({ masterVolume: val }),
-      }),
-    );
-
-    panel.appendChild(
-      createSlider({
-        label: 'SFX Volume',
-        value: s.sfxVolume,
-        min: 0,
-        max: 100,
-        step: 5,
-        unit: '%',
-        onChange: (val) => this.settingsService.update({ sfxVolume: val }),
-      }),
-    );
-
-    panel.appendChild(
-      createSlider({
-        label: 'Music Volume',
-        value: s.musicVolume,
-        min: 0,
-        max: 100,
-        step: 5,
-        unit: '%',
-        onChange: (val) => this.settingsService.update({ musicVolume: val }),
-      }),
-    );
-
+    const vols: [string, 'masterVolume' | 'sfxVolume' | 'musicVolume'][] = [
+      ['Master Volume', 'masterVolume'],
+      ['SFX Volume', 'sfxVolume'],
+      ['Music Volume', 'musicVolume'],
+    ];
+    for (const [label, key] of vols) {
+      panel.appendChild(
+        createSlider({
+          label,
+          value: s[key],
+          min: 0,
+          max: 100,
+          step: 5,
+          unit: '%',
+          onChange: (val) => this.settingsService.update({ [key]: val }),
+        }),
+      );
+    }
     return panel;
   }
 
@@ -225,6 +206,36 @@ export class SettingsScreen {
         onChange: (val) =>
           this.settingsService.update({
             controlScheme: val as UserSettings['controlScheme'],
+          }),
+      }),
+    );
+
+    panel.appendChild(
+      createDropdown({
+        label: 'Touch Steering Side',
+        items: [
+          { value: 'left', label: 'Left (Steer Left, Gas/Brake Right)' },
+          { value: 'right', label: 'Right (Steer Right, Gas/Brake Left)' },
+        ],
+        value: s.touchSteerSide,
+        onChange: (val) =>
+          this.settingsService.update({
+            touchSteerSide: val as UserSettings['touchSteerSide'],
+          }),
+      }),
+    );
+
+    panel.appendChild(
+      createDropdown({
+        label: 'Touch Nitro Position',
+        items: [
+          { value: 'pedals', label: 'With Pedals (Default)' },
+          { value: 'steer', label: 'With Steering (Opposite Thumb)' },
+        ],
+        value: s.touchNitroSide,
+        onChange: (val) =>
+          this.settingsService.update({
+            touchNitroSide: val as UserSettings['touchNitroSide'],
           }),
       }),
     );
