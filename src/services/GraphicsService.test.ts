@@ -99,5 +99,60 @@ describe('GraphicsService', () => {
     service.setGraphics('low', 0.8);
     expect(emitCount).toBe(1);
   });
-});
 
+  describe('Auto mode and performance probe', () => {
+    it('supports auto tier option and initial performance probe', () => {
+      const bus = new EventBus<GameEvents>();
+      const service = new GraphicsService({ bus, defaultTier: 'auto' });
+
+      expect(service.isAuto()).toBe(true);
+      expect(service.getSelectedOption()).toBe('auto');
+
+      // Probing with fast frame times (~15ms) sets high tier
+      const chosen = service.probeAndApplyInitialTier([0.015, 0.016, 0.014]);
+      expect(chosen).toBe('high');
+      expect(service.getTierId()).toBe('high');
+      expect(service.isAuto()).toBe(true);
+    });
+
+    it('adapts scale and tier automatically when recordFrame is called in auto mode', () => {
+      const bus = new EventBus<GameEvents>();
+      const service = new GraphicsService({ bus, defaultTier: 'auto' });
+      service.probeAndApplyInitialTier([0.015]); // Set to high
+
+      let lastScale = 1.0;
+      let lastTier = 'high';
+      bus.on('graphics:changed', (payload) => {
+        lastScale = payload.resolutionScale;
+        lastTier = payload.tier.id;
+      });
+
+      // Feed 0.025s (40 FPS, which is < 55 FPS downgrade threshold for High) for >5 seconds
+      const frameDt = 0.025;
+      const steps = Math.ceil(5.0 / frameDt) + 20;
+      for (let i = 0; i < steps; i++) {
+        service.recordFrame(frameDt, true);
+      }
+
+      expect(lastScale).toBe(0.9);
+      expect(service.getResolutionScale()).toBe(0.9);
+      expect(lastTier).toBe('high');
+    });
+
+    it('switches between manual and auto cleanly', () => {
+      const bus = new EventBus<GameEvents>();
+      const service = new GraphicsService({ bus, defaultTier: 'medium' });
+
+      expect(service.isAuto()).toBe(false);
+
+      service.setTier('auto');
+      expect(service.isAuto()).toBe(true);
+      expect(service.getSelectedOption()).toBe('auto');
+
+      service.setTier('low');
+      expect(service.isAuto()).toBe(false);
+      expect(service.getSelectedOption()).toBe('low');
+      expect(service.getTierId()).toBe('low');
+    });
+  });
+});

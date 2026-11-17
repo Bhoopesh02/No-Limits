@@ -7,6 +7,7 @@ export interface DebugAuditStats {
 
 export interface DebugGraphicsStats {
   readonly tierId: string;
+  readonly isAuto?: boolean;
   readonly effectivePixelRatio: number;
   readonly resolutionScale: number;
   readonly shadowMode: string;
@@ -119,8 +120,9 @@ export class DebugOverlay {
       let graphicsHtml = '';
       if (this.graphicsProvider) {
         const g = this.graphicsProvider();
+        const tierLabel = g.isAuto ? `AUTO (${g.tierId.toUpperCase()})` : g.tierId.toUpperCase();
         graphicsHtml = `
-          <div>Tier: <strong style="color: var(--text-primary);">${g.tierId.toUpperCase()}</strong> | DPR: <strong style="color: var(--text-primary);">${g.effectivePixelRatio.toFixed(2)}</strong> (Scale: <strong style="color: var(--text-primary);">${g.resolutionScale.toFixed(2)}</strong>)</div>
+          <div>Tier: <strong style="color: var(--text-primary);">${tierLabel}</strong> | DPR: <strong style="color: var(--text-primary);">${g.effectivePixelRatio.toFixed(2)}</strong> (Scale: <strong style="color: var(--text-primary);">${g.resolutionScale.toFixed(2)}</strong>)</div>
           <div>Shadows: <strong style="color: var(--text-primary);">${g.shadowMode}</strong> | Far: <strong style="color: var(--text-primary);">${g.cameraFar}m</strong> | Opponents: <strong style="color: var(--text-primary);">${g.opponentCount}</strong></div>
         `;
       }

@@ -14,12 +14,15 @@ import type { CarView } from '../render/CarView';
 import type { Renderer } from '../render/Renderer';
 import type { TierApplier } from '../render/TierApplier';
 import type { TrackView } from '../render/TrackView';
+import type { GraphicsService } from '../services/GraphicsService';
+import type { SettingsService } from '../services/SettingsService';
 import { ScreenManager } from '../ui/ScreenManager';
 import { BootScreen } from '../ui/screens/BootScreen';
 import { LoadingScreen } from '../ui/screens/LoadingScreen';
 import { MenuScreen } from '../ui/screens/MenuScreen';
 import { PauseOverlay } from '../ui/screens/PauseOverlay';
 import { ResultsScreen } from '../ui/screens/ResultsScreen';
+import { SettingsScreen } from '../ui/screens/SettingsScreen';
 import { RaceSession } from './RaceSession';
 
 export interface GameFlowOptions {
@@ -34,6 +37,8 @@ export interface GameFlowOptions {
   readonly bus: EventBus<GameEvents>;
   readonly isTouch: boolean;
   readonly onPauseStateChange?: (isPaused: boolean) => void;
+  readonly graphicsService?: GraphicsService;
+  readonly settingsService?: SettingsService;
 }
 
 export class GameFlow {
@@ -52,6 +57,7 @@ export class GameFlow {
   private readonly stateMachine: StateMachine<GameState>;
   private readonly screenManager: ScreenManager;
   private readonly pauseOverlay: PauseOverlay;
+  private readonly settingsScreen?: SettingsScreen;
 
   private readonly loadingScreen: LoadingScreen;
   private readonly resultsScreen: ResultsScreen;
@@ -85,7 +91,16 @@ export class GameFlow {
       bus: this.bus,
     });
 
-    // 3. Register screens
+    // 3. Settings modal
+    if (options.settingsService && options.graphicsService) {
+      this.settingsScreen = new SettingsScreen({
+        settingsService: options.settingsService,
+        graphicsService: options.graphicsService,
+      });
+      this.uiRoot.appendChild(this.settingsScreen.modal);
+    }
+
+    // 4. Register screens
     const bootScreen = new BootScreen({
       onStart: () => {
         this.transitionTo('Menu');
@@ -95,6 +110,9 @@ export class GameFlow {
     const menuScreen = new MenuScreen({
       onPlay: () => {
         this.transitionTo('Loading');
+      },
+      onSettings: () => {
+        this.settingsScreen?.open();
       },
     });
 
@@ -118,7 +136,7 @@ export class GameFlow {
     this.screenManager.registerScreen('Loading', this.loadingScreen);
     this.screenManager.registerScreen('Results', this.resultsScreen);
 
-    // 4. Pause overlay
+    // 5. Pause overlay
     this.pauseOverlay = new PauseOverlay({
       onResume: () => {
         this.onPauseStateChange?.(false);
@@ -126,6 +144,9 @@ export class GameFlow {
       onRestart: () => {
         this.onPauseStateChange?.(false);
         this.transitionTo('Loading');
+      },
+      onSettings: () => {
+        this.settingsScreen?.open();
       },
       onQuit: () => {
         this.onPauseStateChange?.(false);
@@ -260,6 +281,10 @@ export class GameFlow {
     return this.stateMachine.getState();
   }
 
+  public getSettingsScreen(): SettingsScreen | undefined {
+    return this.settingsScreen;
+  }
+
   public dispose(): void {
     for (const unsub of this.unsubs) {
       unsub();
@@ -269,5 +294,6 @@ export class GameFlow {
     this.raceSession = null;
     this.screenManager.dispose();
     this.pauseOverlay.dispose();
+    this.settingsScreen?.dispose();
   }
 }

@@ -184,6 +184,10 @@ export class RaceSession {
     return this.standings;
   }
 
+  public getPlayerState(): VehicleState {
+    return this.currentStates[this.playerRacerIndex];
+  }
+
   public resetCarsToGrid(slots?: readonly GridSlot[]): void {
     const grid = slots ?? buildGridLayout(this.spline, this.totalRacers);
     const initialDistances: number[] = new Array(this.totalRacers);

@@ -4,6 +4,7 @@ import { createModal, ModalElement } from '../components/Modal';
 export interface PauseOverlayOptions {
   readonly onResume: () => void;
   readonly onRestart: () => void;
+  readonly onSettings?: () => void;
   readonly onQuit: () => void;
 }
 
@@ -37,6 +38,18 @@ export class PauseOverlay {
     });
     restartBtn.style.minHeight = '48px';
     content.appendChild(restartBtn);
+
+    if (options.onSettings) {
+      const settingsBtn = createButton({
+        variant: 'secondary',
+        label: 'Settings',
+        onClick: () => {
+          options.onSettings?.();
+        },
+      });
+      settingsBtn.style.minHeight = '48px';
+      content.appendChild(settingsBtn);
+    }
 
     const quitBtn = createButton({
       variant: 'secondary',

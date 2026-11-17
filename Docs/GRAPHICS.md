@@ -43,9 +43,38 @@ To maintain 60 FPS without frame drops, visual pop, or tearing during active rac
 
 ---
 
-## 3. Planned Auto Mode (Task 11B)
+## 3. Auto Mode Architecture (Task 11B)
 
-Auto mode runs a short frame-time probe during the initial launch and continuously evaluates rolling average frame time during active gameplay. If average frame rate remains below the target threshold (e.g. < 45 FPS on Medium or < 30 FPS on Low) for 5 consecutive seconds, resolution scale drops progressively (from 1.0 down to a floor of 0.6) before downgrading to the next lower graphics tier. Conversely, sustained performance overhead triggers upscale and tier promotion.
+Auto mode is fully implemented via `PerformanceMonitor`, `GraphicsService`, and `SettingsService`. It selects an initial tier with a startup benchmark/probe and continuously adapts during active racing:
+
+### Initial Performance Probe
+
+During startup / boot, `probeInitialTier()` measures frame delta times across sample frames:
+
+- **High Tier (`high`):** Average frame time $\le 17.5\text{ ms}$ ($\ge 57.1\text{ FPS}$).
+- **Medium Tier (`medium`):** Average frame time $\le 24.0\text{ ms}$ ($41.6$ to $57.1\text{ FPS}$).
+- **Low Tier (`low`):** Average frame time $> 24.0\text{ ms}$ ($< 41.6\text{ FPS}$).
+
+### Runtime Adaptation & Dynamic Resolution
+
+During active racing (`Race` state), `recordFrame(frameDt, isEligibleForAuto)` tracks rolling average frame times via exponential smoothing ($\alpha = 0.05$) with zero heap allocations per frame:
+
+1. **Downgrade Escalation:**
+   - If rolling FPS stays below the tier threshold for $5.0$ consecutive seconds:
+     - **High Tier Threshold:** $< 55\text{ FPS}$ (target 60 FPS).
+     - **Medium Tier Threshold:** $< 45\text{ FPS}$ (target 45–60 FPS).
+     - **Low Tier Threshold:** $< 30\text{ FPS}$ (target 30 FPS).
+   - If `resolutionScale > 0.65`: Resolution scale drops by $0.1$ step down to the $0.60$ floor.
+   - If `resolutionScale \le 0.60`: The graphics tier is downgraded by one tier (High $\to$ Medium, or Medium $\to$ Low), and resolution scale resets to $1.00$ to provide scaling headroom.
+
+2. **Promotion & Upscaling:**
+   - Requires $10.0$ consecutive seconds of sustained performance overhead (hysteresis) to prevent flapping or thrashing:
+     - **Low Tier Upgrade:** $\ge 48\text{ FPS}$ promotes scale by $+0.1$ up to $1.00$, then upgrades tier to `medium`.
+     - **Medium Tier Upgrade:** $\ge 58\text{ FPS}$ promotes scale by $+0.1$ up to $1.00$, then upgrades tier to `high`.
+
+3. **Settings Screen & Persistence:**
+   - `SettingsScreen` enables player control over Graphics Quality (`auto`, `high`, `medium`, `low`), dynamic resolution scaling, audio volumes, controls, and accessibility.
+   - Preferences persist across sessions via `SettingsService` in `localStorage`.
 
 ---
 

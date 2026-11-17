@@ -11,8 +11,8 @@ export interface AiTuningDevControls {
 }
 
 export interface GraphicsDevControls {
-  getTierId: () => 'low' | 'medium' | 'high';
-  setTierId: (tierId: 'low' | 'medium' | 'high') => void;
+  getTierId: () => 'auto' | 'low' | 'medium' | 'high';
+  setTierId: (tierId: 'auto' | 'low' | 'medium' | 'high') => void;
   getResolutionScale: () => number;
   setResolutionScale: (scale: number) => void;
 }
@@ -274,13 +274,14 @@ export class TuningPanel {
       const tierDropdown = createDropdown({
         label: 'Graphics Tier',
         items: [
+          { value: 'auto', label: 'Auto' },
           { value: 'low', label: 'Low' },
           { value: 'medium', label: 'Medium' },
           { value: 'high', label: 'High' },
         ],
         value: this.graphicsDevControls.getTierId(),
         onChange: (v) => {
-          this.graphicsDevControls?.setTierId(v as 'low' | 'medium' | 'high');
+          this.graphicsDevControls?.setTierId(v as 'auto' | 'low' | 'medium' | 'high');
         },
       });
       this.sliderListEl.appendChild(tierDropdown);

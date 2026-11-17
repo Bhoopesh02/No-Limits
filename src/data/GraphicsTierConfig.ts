@@ -1,7 +1,32 @@
 export type ShadowType = 'none' | 'pcf' | 'pcfSoft';
+export type GraphicsTierId = 'low' | 'medium' | 'high';
+export type GraphicsTierOption = 'auto' | GraphicsTierId;
+
+export const AUTO_DOWNGRADE_TIME_S = 5.0;
+export const AUTO_UPGRADE_TIME_S = 10.0;
+export const RESOLUTION_SCALE_FLOOR = 0.6;
+export const RESOLUTION_SCALE_CEILING = 1.0;
+export const RESOLUTION_SCALE_STEP = 0.1;
+
+export const FPS_THRESHOLDS = {
+  high: {
+    target: 60,
+    downgrade: 55,
+  },
+  medium: {
+    target: 45,
+    downgrade: 45,
+    upgrade: 58,
+  },
+  low: {
+    target: 30,
+    downgrade: 30,
+    upgrade: 48,
+  },
+} as const;
 
 export interface GraphicsTierConfig {
-  readonly id: 'low' | 'medium' | 'high';
+  readonly id: GraphicsTierId;
   /** Maximum device pixel ratio cap (unitless scalar, e.g. 1.0, 1.5, 2.0). */
   readonly pixelRatioCap: number;
   /** High-level shadow identifier ('blob' | 'map' | 'softMap'). */

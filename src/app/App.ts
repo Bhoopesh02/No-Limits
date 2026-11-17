@@ -1,3 +1,4 @@
+import { AudioEngine } from '../audio/AudioEngine';
 import { EventBus } from '../core/EventBus';
 import { GameLoop } from '../core/GameLoop';
 import { DEFAULT_CAR_KAZE } from '../data/CarData';
@@ -16,6 +17,7 @@ import { Renderer } from '../render/Renderer';
 import { auditScene } from '../render/sceneAudit';
 import { TierApplier } from '../render/TierApplier';
 import { GraphicsService } from '../services/GraphicsService';
+import { SettingsService } from '../services/SettingsService';
 import { createRotateHint, RotateHintElement } from '../ui/components/RotateHint';
 import { createTouchControls, TouchControlsElement } from '../ui/components/TouchControls';
 import { GameFlow } from './GameFlow';
@@ -38,6 +40,7 @@ interface DevTools {
  */
 export class App {
   private readonly bus: EventBus<GameEvents>;
+  private readonly settingsService: SettingsService;
   private readonly graphicsService: GraphicsService;
   private readonly renderer: Renderer;
   private readonly tierApplier: TierApplier;
@@ -55,6 +58,7 @@ export class App {
   private readonly rotateHint: RotateHintElement;
   private readonly gameFlow: GameFlow;
   private readonly gameLoop: GameLoop;
+  private readonly audioEngine: AudioEngine;
 
   private readonly pauseReasons = new Set<string>();
   private lastRenderTimestampMs = performance.now();
@@ -72,10 +76,25 @@ export class App {
     const uiRootId = options.uiRootId ?? 'ui-root';
 
     this.bus = new EventBus<GameEvents>();
-    this.graphicsService = new GraphicsService({ bus: this.bus });
+    this.settingsService = new SettingsService();
+    this.audioEngine = new AudioEngine({
+      initialMaster: this.settingsService.get('masterVolume'),
+      initialSfx: this.settingsService.get('sfxVolume'),
+      initialMusic: this.settingsService.get('musicVolume'),
+    });
+    this.settingsService.subscribe((s) => this.audioEngine.syncVolumes(s));
+    this.graphicsService = new GraphicsService({
+      bus: this.bus,
+      defaultTier: this.settingsService.get('graphicsTier'),
+      initialScale: this.settingsService.get('resolutionScale'),
+    });
     this.renderer = new Renderer(gameRootId, uiRootId);
     this.tierApplier = new TierApplier(this.renderer);
     this.cameraRig = new CameraRig(this.renderer.camera, { maxSpeed: DEFAULT_CAR_KAZE.topSpeed });
+
+    if (this.graphicsService.isAuto()) {
+      this.graphicsService.probeAndApplyInitialTier();
+    }
 
     const initialTier = this.graphicsService.getTier();
     const initialScale = this.graphicsService.getResolutionScale();
@@ -130,6 +149,8 @@ export class App {
       tierApplier: this.tierApplier,
       bus: this.bus,
       isTouch: this.touchControls.isVisible(),
+      graphicsService: this.graphicsService,
+      settingsService: this.settingsService,
       onPauseStateChange: (paused) => {
         if (paused) this.addPauseReason('user_pause');
         else this.removePauseReason('user_pause');
@@ -142,6 +163,14 @@ export class App {
       const state = this.gameFlow.getState();
       if (state === 'Menu' || state === 'Results' || state === 'Boot') {
         this.carView.setDetail(getCarDetailForTier(payload.tier.id));
+      }
+    });
+
+    this.bus.on('state:change', ({ to }) => {
+      if (to === 'Race') {
+        this.audioEngine.startPlayerEngine();
+      } else {
+        this.audioEngine.stopPlayerEngine();
       }
     });
 
@@ -163,6 +192,7 @@ export class App {
           const activeSession = this.gameFlow.getActiveRaceSession();
           return {
             tierId: tier.id,
+            isAuto: this.graphicsService.isAuto(),
             effectivePixelRatio: getEffectivePixelRatio(dpr, tier.pixelRatioCap, scale),
             resolutionScale: scale,
             shadowMode: tier.shadows,
@@ -189,7 +219,7 @@ export class App {
             },
           },
           {
-            getTierId: () => this.graphicsService.getTierId(),
+            getTierId: () => this.graphicsService.getSelectedOption(),
             setTierId: (id) => this.graphicsService.setTier(id),
             getResolutionScale: () => this.graphicsService.getResolutionScale(),
             setResolutionScale: (s) => this.graphicsService.setResolutionScale(s),
@@ -224,18 +254,28 @@ export class App {
     return this.graphicsService;
   }
 
+  public getSettingsService(): SettingsService {
+    return this.settingsService;
+  }
+
   public getTierApplier(): TierApplier {
     return this.tierApplier;
   }
 
+  public getAudioEngine(): AudioEngine {
+    return this.audioEngine;
+  }
+
   public addPauseReason(reason: string): void {
     this.pauseReasons.add(reason);
+    this.audioEngine.setPaused(true);
   }
 
   public removePauseReason(reason: string): void {
     this.pauseReasons.delete(reason);
     if (this.pauseReasons.size === 0) {
       this.lastRenderTimestampMs = performance.now();
+      this.audioEngine.setPaused(false);
     }
   }
 
@@ -263,6 +303,7 @@ export class App {
     this.carFactory.dispose();
     this.cameraRig.dispose();
     this.renderer.dispose();
+    this.audioEngine.dispose();
     this.debugOverlay?.dispose();
     this.tuningPanel?.dispose();
   }
@@ -287,6 +328,12 @@ export class App {
     const t0 = performance.now();
     const input = this.inputManager.poll();
     this.gameFlow.simulate(fixedDt, input);
+    if (this.gameFlow.getStateMachine().getState() === 'Race') {
+      const ps = this.gameFlow.getActiveRaceSession()?.getPlayerState();
+      if (ps) {
+        this.audioEngine.updatePlayerEngine(ps.forwardSpeed, input.throttle, ps.isReversing, fixedDt);
+      }
+    }
     this.debugOverlay?.recordSimStep?.(performance.now() - t0);
   };
 
@@ -302,6 +349,9 @@ export class App {
     if (this.touchControls.isVisible()) {
       this.touchControls.style.display = isRaceState ? 'block' : 'none';
     }
+
+    const isSimulatingOrRacing = isRaceState && !this.isPaused();
+    this.graphicsService.recordFrame(frameDt, isSimulatingOrRacing);
 
     this.gameFlow.render(alpha, frameDt);
     this.renderer.render();

@@ -4,6 +4,7 @@ import type { Screen } from './Screen';
 
 export interface MenuScreenOptions {
   readonly onPlay: () => void;
+  readonly onSettings?: () => void;
 }
 
 export class MenuScreen implements Screen {
@@ -56,22 +57,15 @@ export class MenuScreen implements Screen {
     garageWrapper.appendChild(garageBadge);
     nav.appendChild(garageWrapper);
 
-    // 3. Settings (disabled with "Coming soon" label)
-    const settingsWrapper = document.createElement('div');
-    settingsWrapper.className = 'nl-menu-btn-wrapper';
+    // 3. Settings button
     const settingsBtn = createButton({
       variant: 'secondary',
       label: 'Settings',
-      disabled: true,
+      onClick: () => options.onSettings?.(),
     });
     settingsBtn.style.minHeight = '48px';
-    settingsBtn.style.flex = '1';
-    const settingsBadge = document.createElement('span');
-    settingsBadge.className = 'nl-badge--coming-soon';
-    settingsBadge.textContent = 'Coming soon';
-    settingsWrapper.appendChild(settingsBtn);
-    settingsWrapper.appendChild(settingsBadge);
-    nav.appendChild(settingsWrapper);
+    settingsBtn.style.width = '100%';
+    nav.appendChild(settingsBtn);
 
     this.element.appendChild(nav);
 
