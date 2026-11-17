@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { EventBus } from '../core/EventBus';
+import type { GameEvents } from '../data/GameEvents';
 import { AudioEngine } from './AudioEngine';
 import { MockAudioContext } from './mockAudioContext';
 
@@ -84,16 +86,26 @@ describe('AudioEngine', () => {
     expect(audio.getMixer()?.isMuted()).toBe(false);
   });
 
-  it('runs player engine methods and disposes cleanly', () => {
+  it('runs player engine and sfx methods and disposes cleanly', () => {
     const mockCtx = new MockAudioContext();
+    const bus = new EventBus<GameEvents>();
     const audio = new AudioEngine({
       audioContext: mockCtx as unknown as AudioContext,
+      bus,
     });
 
+    expect(audio.getSoundEffects()).toBeDefined();
+
     audio.startPlayerEngine();
-    audio.updatePlayerEngine(30, 0.8, false, 0.016);
+    audio.updatePlayerAudio(30, 2.5, 0.8, false, true, 1.5, 0.016);
     expect(audio.getPlayerEngine()?.getRpm()).toBeGreaterThan(850);
 
+    // Event bus triggers
+    bus.emit('race:countdown', { count: 3 });
+    bus.emit('race:countdown', { count: 'GO' });
+    bus.emit('menu:navigate', 'confirm');
+
+    audio.playCollision(20);
     audio.stopPlayerEngine();
     audio.dispose();
   });

@@ -1,11 +1,15 @@
+import type { EventBus, Unsubscribe } from '../core/EventBus';
+import type { GameEvents } from '../data/GameEvents';
 import { EngineSound } from './EngineSound';
 import { Mixer } from './Mixer';
+import { SoundEffects } from './SoundEffects';
 
 export interface AudioEngineOptions {
   readonly initialMaster?: number;
   readonly initialSfx?: number;
   readonly initialMusic?: number;
   readonly audioContext?: AudioContext;
+  readonly bus?: EventBus<GameEvents>;
 }
 
 export interface AudioVolumes {
@@ -16,17 +20,19 @@ export interface AudioVolumes {
 
 /**
  * Top-level Web Audio API coordinator.
- * Manages audio context lifecycle, user gesture unlock, mixer buses, and procedural vehicle sound.
+ * Manages audio context lifecycle, user gesture unlock, mixer buses, engine audio, and physics SFX.
  */
 export class AudioEngine {
   private readonly ctx: AudioContext | null = null;
   private readonly mixer: Mixer | null = null;
   private playerEngine: EngineSound | null = null;
+  private soundEffects: SoundEffects | null = null;
 
   private isSupported = false;
   private isUnlocked = false;
   private isPaused = false;
   private unlockListenerAttached = false;
+  private readonly busUnsubs: Unsubscribe[] = [];
 
   constructor(options: AudioEngineOptions = {}) {
     if (options.audioContext) {
@@ -54,11 +60,23 @@ export class AudioEngine {
       });
 
       this.playerEngine = new EngineSound(this.ctx, this.mixer.getEngineGainNode());
+      this.soundEffects = new SoundEffects(this.ctx, this.mixer.getSfxGainNode());
 
       this.isUnlocked = this.ctx.state === 'running';
       if (!this.isUnlocked) {
         this.attachUnlockListeners();
       }
+    }
+
+    if (options.bus) {
+      this.busUnsubs.push(
+        options.bus.on('race:countdown', ({ count }) => {
+          this.soundEffects?.playCountdown(count);
+        }),
+        options.bus.on('menu:navigate', () => {
+          this.soundEffects?.playUiClick();
+        }),
+      );
     }
   }
 
@@ -82,6 +100,10 @@ export class AudioEngine {
     return this.playerEngine;
   }
 
+  public getSoundEffects(): SoundEffects | null {
+    return this.soundEffects;
+  }
+
   /**
    * Unlock AudioContext on user interaction.
    */
@@ -99,18 +121,42 @@ export class AudioEngine {
   }
 
   public startPlayerEngine(): void {
-    if (!this.playerEngine) return;
-    this.playerEngine.start();
+    this.playerEngine?.start();
+    this.soundEffects?.start();
   }
 
   public stopPlayerEngine(): void {
-    if (!this.playerEngine) return;
-    this.playerEngine.stop();
+    this.playerEngine?.stop();
+    this.soundEffects?.stop();
   }
 
   public updatePlayerEngine(speed: number, throttle: number, isReversing: boolean, dt: number): void {
-    if (!this.playerEngine) return;
-    this.playerEngine.update(speed, throttle, isReversing, dt);
+    this.playerEngine?.update(speed, throttle, isReversing, dt);
+  }
+
+  public updatePlayerAudio(
+    forwardSpeed: number,
+    lateralSpeed: number,
+    throttle: number,
+    isReversing: boolean,
+    isDrifting: boolean,
+    nitroActiveTime: number,
+    dt: number,
+  ): void {
+    this.playerEngine?.update(forwardSpeed, throttle, isReversing, dt);
+    this.soundEffects?.update(lateralSpeed, isDrifting, nitroActiveTime, Math.abs(forwardSpeed));
+  }
+
+  public playCountdown(count: number | 'GO'): void {
+    this.soundEffects?.playCountdown(count);
+  }
+
+  public playUiClick(): void {
+    this.soundEffects?.playUiClick();
+  }
+
+  public playCollision(impactSpeed?: number): void {
+    this.soundEffects?.playCollision(impactSpeed);
   }
 
   public syncVolumes(volumes: AudioVolumes): void {
@@ -136,7 +182,12 @@ export class AudioEngine {
 
   public dispose(): void {
     this.detachUnlockListeners();
+    for (const unsub of this.busUnsubs) {
+      unsub();
+    }
+    this.busUnsubs.length = 0;
     this.playerEngine?.dispose();
+    this.soundEffects?.dispose();
     this.mixer?.dispose();
     if (this.ctx && this.ctx.state !== 'closed') {
       try {

@@ -78,6 +78,7 @@ export class App {
     this.bus = new EventBus<GameEvents>();
     this.settingsService = new SettingsService();
     this.audioEngine = new AudioEngine({
+      bus: this.bus,
       initialMaster: this.settingsService.get('masterVolume'),
       initialSfx: this.settingsService.get('sfxVolume'),
       initialMusic: this.settingsService.get('musicVolume'),
@@ -167,11 +168,8 @@ export class App {
     });
 
     this.bus.on('state:change', ({ to }) => {
-      if (to === 'Race') {
-        this.audioEngine.startPlayerEngine();
-      } else {
-        this.audioEngine.stopPlayerEngine();
-      }
+      if (to === 'Race') this.audioEngine.startPlayerEngine();
+      else this.audioEngine.stopPlayerEngine();
     });
 
     if (import.meta.env.DEV) {
@@ -331,7 +329,10 @@ export class App {
     if (this.gameFlow.getStateMachine().getState() === 'Race') {
       const ps = this.gameFlow.getActiveRaceSession()?.getPlayerState();
       if (ps) {
-        this.audioEngine.updatePlayerEngine(ps.forwardSpeed, input.throttle, ps.isReversing, fixedDt);
+        this.audioEngine.updatePlayerAudio(
+          ps.forwardSpeed, ps.lateralSpeed, input.throttle,
+          ps.isReversing, ps.isDrifting, ps.nitroActiveTime, fixedDt,
+        );
       }
     }
     this.debugOverlay?.recordSimStep?.(performance.now() - t0);
