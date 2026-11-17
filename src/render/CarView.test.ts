@@ -92,4 +92,22 @@ describe('CarView', () => {
 
     carView.dispose();
   });
+
+  it('toggles blob shadow visibility and updates detail level', () => {
+    const carView = new CarView({ tier: 'low' });
+    expect(carView.getDetail()).toBe('low');
+
+    carView.setBlobShadowVisible(false);
+    carView.setBlobShadowVisible(true);
+
+    // Switch detail in place
+    carView.setDetail('medium');
+    expect(carView.getDetail()).toBe('medium');
+
+    carView.setDetail('high');
+    expect(carView.getDetail()).toBe('high');
+
+    carView.dispose();
+    expect(carView.getRoot().children.length).toBe(0);
+  });
 });

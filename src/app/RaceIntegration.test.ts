@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import rawTrack from '../../public/assets/tracks/coastal-highway/data/track-coastal-highway.json';
+import trackJson from '../../public/assets/tracks/coastal-highway/data/track-coastal-highway.json';
 import { AiDriver } from '../ai/AiDriver';
 import { RacingLine } from '../ai/RacingLine';
 import { EventBus } from '../core/EventBus';
 import { DEFAULT_CAR_KAZE } from '../data/CarData';
 import type { GameEvents } from '../data/GameEvents';
-import type { TrackControlPoint, TrackData } from '../data/TrackData';
+import type { TrackData } from '../data/TrackData';
 import { Spline } from '../race/Spline';
 import { CarFactory } from '../render/car/CarFactory';
 import { RaceSession } from './RaceSession';
@@ -16,7 +16,6 @@ interface MockElement {
   style: Record<string, string>;
   children: MockElement[];
   innerHTML: string;
-  textContent: string;
   classList: {
     add: (c: string) => void;
     remove: (c: string) => void;
@@ -37,7 +36,6 @@ function createMockElement(tag = 'div'): MockElement {
     style: {},
     children,
     innerHTML: '',
-    textContent: '',
     classList: {
       add: (c: string) => classes.add(c),
       remove: (c: string) => classes.delete(c),
@@ -51,7 +49,7 @@ function createMockElement(tag = 'div'): MockElement {
   return el;
 }
 
-describe('Full 6-car Race Integration Test', () => {
+describe('Variable-car Race Integration Tests (N = 3, 4, 5 opponents)', () => {
   const originalDocument = globalThis.document;
 
   beforeEach(() => {
@@ -69,33 +67,32 @@ describe('Full 6-car Race Integration Test', () => {
     (globalThis as any).document = originalDocument;
   });
 
-  it('simulates a 6-car race to completion with valid standings, classification, and no NaNs', () => {
-    // 1. Configure a 1-lap race to keep headless test execution snappy while testing full lifecycle
+  function simulateRaceWithOpponents(opponentCount: number) {
+    const totalRacers = opponentCount + 1;
+
     const trackData: TrackData = {
-      id: rawTrack.id,
-      displayName: rawTrack.displayName,
-      laps: 1,
-      checkpointCount: rawTrack.checkpointCount ?? 16,
-      lengthMeters: rawTrack.lengthMeters ?? 2478,
-      scenery: rawTrack.scenery ?? 'coastal',
-      timeOfDayStart: 12,
-      controlPoints: rawTrack.controlPoints as TrackControlPoint[],
+      id: trackJson.id,
+      displayName: trackJson.displayName,
+      laps: 1, // 1 lap for fast, deterministic integration test
+      checkpointCount: trackJson.checkpointCount,
+      lengthMeters: trackJson.lengthMeters,
+      scenery: trackJson.scenery,
+      timeOfDayStart: trackJson.timeOfDayStart,
+      controlPoints: trackJson.controlPoints,
     };
 
     const spline = new Spline(trackData.controlPoints, 1.0);
     const carFactory = new CarFactory();
 
     const sceneChildren: unknown[] = [];
-    const mockScene = {
-      add: (obj: unknown) => sceneChildren.push(obj),
-      remove: (obj: unknown) => {
-        const idx = sceneChildren.indexOf(obj);
-        if (idx !== -1) sceneChildren.splice(idx, 1);
-      },
-    };
-
     const mockRenderer = {
-      scene: mockScene,
+      scene: {
+        add: (obj: unknown) => sceneChildren.push(obj),
+        remove: (obj: unknown) => {
+          const idx = sceneChildren.indexOf(obj);
+          if (idx !== -1) sceneChildren.splice(idx, 1);
+        },
+      },
       camera: { position: { set: () => {} }, lookAt: () => {} },
       getAspect: () => 1.77,
     };
@@ -105,13 +102,7 @@ describe('Full 6-car Race Integration Test', () => {
       update: () => {},
     };
 
-    let playerTelemetry: {
-      x: number;
-      z: number;
-      heading: number;
-      speed: number;
-      lateralSpeed: number;
-    } = {
+    let playerTelemetry = {
       x: 0,
       z: 0,
       heading: 0,
@@ -150,7 +141,8 @@ describe('Full 6-car Race Integration Test', () => {
       cameraRig: mockCameraRig as never,
       carView: mockCarView as never,
       carFactory,
-      playerDetail: 'medium',
+      playerDetail: 'low',
+      opponentCount,
       trackData,
       carData: DEFAULT_CAR_KAZE,
       spline,
@@ -160,7 +152,6 @@ describe('Full 6-car Race Integration Test', () => {
       isTouch: false,
     });
 
-    // Scripted player driver along the racing line with ~92% throttle
     const racingLine = new RacingLine(spline, DEFAULT_CAR_KAZE.topSpeed);
     const playerDriver = new AiDriver({
       driver: {
@@ -177,19 +168,16 @@ describe('Full 6-car Race Integration Test', () => {
     });
 
     const fixedDt = 1 / 60;
-    const maxSteps = 4500; // 75 seconds (1 lap takes ~50s)
+    const maxSteps = 4500;
 
     const standings = session.getStandings();
     const raceController = session.getRaceController();
 
-    // Initial render to seed playerTelemetry
     session.render(1.0, fixedDt);
 
-    // 2. Step simulation until finished or timeout
     for (let step = 0; step < maxSteps; step++) {
       const phase = raceController.getPhase();
 
-      // Scripted input for player using updated telemetry
       const playerInput = playerDriver.update(
         playerTelemetry,
         playerDriver.getDistanceAlongTrack(),
@@ -201,20 +189,18 @@ describe('Full 6-car Race Integration Test', () => {
       session.simulate(fixedDt, playerInput);
       session.render(1.0, fixedDt);
 
-      // Verify standings uniqueness at every step: no duplicate ranks
       const seenRanks = new Set<number>();
-      for (let car = 0; car < 6; car++) {
+      for (let car = 0; car < totalRacers; car++) {
         const rank = standings.positionOf(car);
         expect(rank).toBeGreaterThanOrEqual(1);
-        expect(rank).toBeLessThanOrEqual(6);
+        expect(rank).toBeLessThanOrEqual(totalRacers);
         expect(seenRanks.has(rank)).toBe(false);
         seenRanks.add(rank);
       }
 
       if (phase === 'Finished' && raceFinishedResult !== null) {
-        // Player has finished; give remaining cars a few seconds to cross the line
         let allCarsFinished = true;
-        for (let car = 0; car < 6; car++) {
+        for (let car = 0; car < totalRacers; car++) {
           if (!standings.hasFinished(car)) {
             allCarsFinished = false;
             break;
@@ -226,46 +212,47 @@ describe('Full 6-car Race Integration Test', () => {
       }
     }
 
-    // 3. Assertions
     expect(raceFinishedResult).not.toBeNull();
     const result = raceController.getResult();
     expect(result).not.toBeNull();
     if (!result) return;
 
-    // A. Total racers
-    expect(result.totalRacers).toBe(6);
+    expect(result.totalRacers).toBe(totalRacers);
+    expect(result.classification).toHaveLength(totalRacers);
 
-    // B. Classification table has 6 rows
-    expect(result.classification).toHaveLength(6);
-
-    // C. Verify classification ordering matches positions (1 to 6)
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < totalRacers; i++) {
       const entry = result.classification[i];
       expect(entry.position).toBe(i + 1);
-      // Winner has total time formatted
       if (i === 0) {
         expect(entry.formattedTimeOrGap).toContain(':');
       }
     }
 
-    // D. Player entry exists and is highlighted
     const playerEntry = result.classification.find((e) => e.isPlayer);
     expect(playerEntry).toBeDefined();
     expect(playerEntry?.position).toBe(result.position);
 
-    // E. Verify all cars finished and finish steps are spread across a plausible window
     const firstCarStep = standings.getFinishStep(standings.getCarAtRank(0));
-    const lastCarStep = standings.getFinishStep(standings.getCarAtRank(5));
+    const lastCarStep = standings.getFinishStep(standings.getCarAtRank(totalRacers - 1));
 
     expect(Number.isFinite(firstCarStep)).toBe(true);
     expect(Number.isFinite(lastCarStep)).toBe(true);
-    // Winner and last place must not finish at the identical simulation step
     expect(firstCarStep).toBeLessThan(lastCarStep);
-    // Winner and last car finish within a plausible window (~15 seconds = 900 steps)
     expect(lastCarStep - firstCarStep).toBeLessThan(900);
 
-    // Clean disposal
     session.dispose();
     carFactory.dispose();
+  }
+
+  it('simulates a 3-opponent race (4 cars) to completion with valid standings and classification', () => {
+    simulateRaceWithOpponents(3);
+  });
+
+  it('simulates a 4-opponent race (5 cars) to completion with valid standings and classification', () => {
+    simulateRaceWithOpponents(4);
+  });
+
+  it('simulates a 5-opponent race (6 cars) to completion with valid standings and classification', () => {
+    simulateRaceWithOpponents(5);
   });
 });

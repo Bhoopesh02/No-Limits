@@ -6,11 +6,11 @@ import type { CarDetailLevel } from '../data/CarRenderBudget';
 import { getOpponentCarDetail } from '../data/CarRenderBudget';
 import type { GameEvents } from '../data/GameEvents';
 import type { InputState } from '../data/InputState';
-import { OPPONENT_ROSTER, OpponentDriver } from '../data/OpponentRoster';
+import { OPPONENT_ROSTER, type OpponentDriver } from '../data/OpponentRoster';
 import type { TrackData } from '../data/TrackData';
-import { buildClassification } from '../race/Classification';
 import { CarCollision } from '../race/CarCollision';
-import { buildGridLayout, GridSlot } from '../race/GridLayout';
+import { buildClassification } from '../race/Classification';
+import { buildGridLayout, type GridSlot } from '../race/GridLayout';
 import { LapTimer } from '../race/LapTimer';
 import { RaceController } from '../race/RaceController';
 import type { Spline } from '../race/Spline';
@@ -20,9 +20,10 @@ import type { CameraRig } from '../render/CameraRig';
 import type { CarFactory } from '../render/car/CarFactory';
 import { CarView } from '../render/CarView';
 import type { Renderer } from '../render/Renderer';
+import type { TierApplier } from '../render/TierApplier';
 import type { TrackView } from '../render/TrackView';
 import { VehicleModel } from '../vehicle/VehicleModel';
-import { copyVehicleState, createVehicleState, VehicleState } from '../vehicle/VehicleState';
+import { copyVehicleState, createVehicleState, type VehicleState } from '../vehicle/VehicleState';
 import { RaceHud } from './RaceHud';
 
 export interface RaceSessionOptions {
@@ -31,6 +32,8 @@ export interface RaceSessionOptions {
   readonly carView: CarView;
   readonly carFactory?: CarFactory;
   readonly playerDetail?: CarDetailLevel;
+  readonly opponentCount?: number;
+  readonly tierApplier?: TierApplier;
   readonly trackData: TrackData;
   readonly carData: CarData;
   readonly spline: Spline;
@@ -39,9 +42,6 @@ export interface RaceSessionOptions {
   readonly uiRoot: HTMLElement;
   readonly isTouch: boolean;
 }
-
-const TOTAL_RACERS = 6;
-const PLAYER_RACER_INDEX = 5;
 
 /**
  * Encapsulates the lifecycle, multi-car simulation, view state, AI opponents, and standings for one race.
@@ -54,8 +54,13 @@ export class RaceSession {
   private readonly spline: Spline;
   private readonly trackView: TrackView;
   private readonly raceController: RaceController;
+  private readonly tierApplier?: TierApplier;
 
-  // Multi-car simulation states (indices 0..4: Opponents, 5: Player)
+  public readonly opponentCount: number;
+  public readonly totalRacers: number;
+  public readonly playerRacerIndex: number;
+
+  // Multi-car simulation states (indices 0..N-1: Opponents, N: Player)
   private readonly previousStates: VehicleState[] = [];
   private readonly currentStates: VehicleState[] = [];
   private readonly carDataList: CarData[] = [];
@@ -80,21 +85,27 @@ export class RaceSession {
     this.trackData = options.trackData;
     this.spline = options.spline;
     this.trackView = options.trackView;
+    this.tierApplier = options.tierApplier;
+
+    const requestedOpponents = options.opponentCount ?? 5;
+    this.opponentCount = Math.max(3, Math.min(5, requestedOpponents));
+    this.totalRacers = this.opponentCount + 1;
+    this.playerRacerIndex = this.opponentCount;
 
     // 1. Mount track view to scene
     this.renderer.scene.add(this.trackView.group);
 
     // 2. Precomputed racing line and starting grid
     this.racingLine = new RacingLine(this.spline, options.carData.topSpeed);
-    const slots = buildGridLayout(this.spline);
+    const slots = buildGridLayout(this.spline, this.totalRacers);
 
-    this.standings = new Standings(this.spline.length, TOTAL_RACERS);
-    const initialDistances: number[] = new Array(TOTAL_RACERS);
+    this.standings = new Standings(this.spline.length, this.totalRacers);
+    const initialDistances: number[] = new Array(this.totalRacers);
 
-    // 3. Setup 5 AI Opponents (Indices 0..4)
+    // 3. Setup AI Opponents (Indices 0..opponentCount-1)
     const oppDetail = getOpponentCarDetail(options.playerDetail ?? 'medium');
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < this.opponentCount; i++) {
       const driver: OpponentDriver = OPPONENT_ROSTER[i];
       const slot: GridSlot = slots[i];
       initialDistances[i] = slot.distance;
@@ -123,11 +134,12 @@ export class RaceSession {
       });
       this.renderer.scene.add(oppView.getRoot());
       this.opponentViews.push(oppView);
+      this.tierApplier?.registerCarView(oppView);
     }
 
-    // 4. Setup Player (Index 5)
-    const playerSlot = slots[PLAYER_RACER_INDEX];
-    initialDistances[PLAYER_RACER_INDEX] = playerSlot.distance;
+    // 4. Setup Player (Index = this.playerRacerIndex)
+    const playerSlot = slots[this.playerRacerIndex];
+    initialDistances[this.playerRacerIndex] = playerSlot.distance;
 
     this.previousStates.push(
       createVehicleState(playerSlot.x, playerSlot.y, playerSlot.z, playerSlot.heading, 0),
@@ -137,6 +149,7 @@ export class RaceSession {
     );
     this.carDataList.push(options.carData);
     this.trackLimitsList.push(new TrackLimits(this.spline));
+    this.tierApplier?.registerCarView(this.playerCarView);
 
     this.raceController = new RaceController({
       trackLength: this.spline.length,
@@ -153,7 +166,7 @@ export class RaceSession {
       uiRoot: options.uiRoot,
       isTouch: options.isTouch,
       totalLaps: this.trackData.laps,
-      totalRacers: TOTAL_RACERS,
+      totalRacers: this.totalRacers,
     });
 
     this.resetCarsToGrid(slots);
@@ -172,11 +185,11 @@ export class RaceSession {
   }
 
   public resetCarsToGrid(slots?: readonly GridSlot[]): void {
-    const grid = slots ?? buildGridLayout(this.spline);
-    const initialDistances: number[] = new Array(TOTAL_RACERS);
+    const grid = slots ?? buildGridLayout(this.spline, this.totalRacers);
+    const initialDistances: number[] = new Array(this.totalRacers);
     this.simulationStep = 0;
 
-    for (let i = 0; i < TOTAL_RACERS; i++) {
+    for (let i = 0; i < this.totalRacers; i++) {
       const slot = grid[i];
       initialDistances[i] = slot.distance;
 
@@ -202,20 +215,20 @@ export class RaceSession {
       copyVehicleState(curr, this.previousStates[i]);
       this.trackLimitsList[i].resetHint(slot.distance);
       this.lapTimers[i].reset(slot.distance);
-      if (i < 5) {
+      if (i < this.opponentCount) {
         this.aiDrivers[i].setFinished(false);
       }
     }
 
     this.cameraRig.teleport(
-      this.currentStates[PLAYER_RACER_INDEX],
-      grid[PLAYER_RACER_INDEX].heading,
+      this.currentStates[this.playerRacerIndex],
+      grid[this.playerRacerIndex].heading,
     );
-    this.raceController.reset(grid[PLAYER_RACER_INDEX].distance);
+    this.raceController.reset(grid[this.playerRacerIndex].distance);
     this.standings.reset(initialDistances);
 
     const state = this.raceController.getLapTimer().getState();
-    this.hud.reset(state.currentLap, state.totalLaps, TOTAL_RACERS);
+    this.hud.reset(state.currentLap, state.totalLaps, this.totalRacers);
   }
 
   public layoutHud(isTouch: boolean): void {
@@ -224,13 +237,13 @@ export class RaceSession {
 
   /**
    * Fixed 60 Hz simulation step.
-   * Fixed execution order:
-   * 1. Input: Poll and filter player input through RaceController; poll 5 AI drivers
-   * 2. Vehicles: Step physical vehicle simulation for all 6 cars (VehicleModel.step)
-   * 3. Track Limits: Resolve road boundaries and barriers for all 6 cars (TrackLimits.resolve)
+   * Execution order:
+   * 1. Input: Poll and filter player input through RaceController; poll AI drivers
+   * 2. Vehicles: Step physical vehicle simulation for all cars (VehicleModel.step)
+   * 3. Track Limits: Resolve road boundaries and barriers for all cars (TrackLimits.resolve)
    * 4. Collisions: Resolve pairwise soft car-to-car separations & speed penalties (CarCollision.resolvePairs)
    * 5. Lap & Checkpoint Updates: Update checkpoints and lap timers for all cars; check finishes
-   * 6. Standings: Update accumulated progress and sort 6-car standings
+   * 6. Standings: Update accumulated progress and sort standings
    */
   public simulate(fixedDt: number, rawPlayerInput: InputState): void {
     this.simulationStep++;
@@ -240,16 +253,16 @@ export class RaceSession {
     const playerInput = this.raceController.filterInput(rawPlayerInput);
 
     // Get player's spline projection for AI rubber-banding reference
-    const playerProjection = this.trackLimitsList[PLAYER_RACER_INDEX].getLastProjection();
+    const playerProjection = this.trackLimitsList[this.playerRacerIndex].getLastProjection();
     const playerDistance = playerProjection.distance;
 
     // Snapshot previous states for interpolation
-    for (let i = 0; i < TOTAL_RACERS; i++) {
+    for (let i = 0; i < this.totalRacers; i++) {
       copyVehicleState(this.currentStates[i], this.previousStates[i]);
     }
 
-    // 2. Simulate 5 AI opponents
-    for (let i = 0; i < 5; i++) {
+    // 2. Simulate AI opponents
+    for (let i = 0; i < this.opponentCount; i++) {
       const aiDriver = this.aiDrivers[i];
       const aiState = this.currentStates[i];
       const carData = this.carDataList[i];
@@ -265,7 +278,6 @@ export class RaceSession {
 
       VehicleModel.step(aiState, aiInput, carData, fixedDt, trackLimits);
 
-      // Check if driver needed a standstill recovery respawn
       const respawn = aiDriver.checkRespawn();
       if (respawn) {
         aiState.x = respawn.x;
@@ -282,20 +294,20 @@ export class RaceSession {
 
     // 3. Simulate Player car
     VehicleModel.step(
-      this.currentStates[PLAYER_RACER_INDEX],
+      this.currentStates[this.playerRacerIndex],
       playerInput,
-      this.carDataList[PLAYER_RACER_INDEX],
+      this.carDataList[this.playerRacerIndex],
       fixedDt,
-      this.trackLimitsList[PLAYER_RACER_INDEX],
+      this.trackLimitsList[this.playerRacerIndex],
     );
 
-    // 4. Resolve pairwise car collisions (all 15 pairs)
+    // 4. Resolve pairwise car collisions
     CarCollision.resolvePairs(this.currentStates);
 
     // 5. Update LapTimers and distances for opponents (player lap timer is updated by raceController)
-    for (let i = 0; i < TOTAL_RACERS; i++) {
+    for (let i = 0; i < this.totalRacers; i++) {
       const proj = this.trackLimitsList[i].getLastProjection();
-      if (racePhase !== 'Countdown' && i < 5) {
+      if (racePhase !== 'Countdown' && i < this.opponentCount) {
         if (!this.lapTimers[i].hasFinished()) {
           this.lapTimers[i].update(proj.distance, fixedDt);
           if (this.lapTimers[i].hasFinished()) {
@@ -309,50 +321,54 @@ export class RaceSession {
 
     // 6. Sort standings and compute race classification
     this.standings.sort();
-    const playerPosition = this.standings.positionOf(PLAYER_RACER_INDEX);
+    const playerPosition = this.standings.positionOf(this.playerRacerIndex);
 
-    const playerProj = this.trackLimitsList[PLAYER_RACER_INDEX].getLastProjection();
+    const playerProj = this.trackLimitsList[this.playerRacerIndex].getLastProjection();
     const classification = buildClassification(
       this.standings,
       this.lapTimers,
       OPPONENT_ROSTER,
-      PLAYER_RACER_INDEX,
+      this.playerRacerIndex,
       this.raceController.getTotalTimeMs(fixedDt),
     );
 
     this.raceController.update(playerProj.distance, fixedDt, playerPosition, classification);
-    if (this.lapTimers[PLAYER_RACER_INDEX].hasFinished()) {
-      this.standings.recordFinish(PLAYER_RACER_INDEX, this.simulationStep);
+    if (this.lapTimers[this.playerRacerIndex].hasFinished()) {
+      this.standings.recordFinish(this.playerRacerIndex, this.simulationStep);
     }
   }
 
   public render(alpha: number, frameDt: number): void {
     // 1. Interpolate player car view & update camera
     this.playerCarView.update(
-      this.previousStates[PLAYER_RACER_INDEX],
-      this.currentStates[PLAYER_RACER_INDEX],
+      this.previousStates[this.playerRacerIndex],
+      this.currentStates[this.playerRacerIndex],
       alpha,
     );
 
+    const playerPos = this.playerCarView.getPosition();
     this.cameraRig.update(
-      this.playerCarView.getPosition(),
+      playerPos,
       this.playerCarView.getHeading(),
-      this.currentStates[PLAYER_RACER_INDEX].speed,
+      this.currentStates[this.playerRacerIndex].speed,
       frameDt,
       this.renderer.getAspect(),
-      this.currentStates[PLAYER_RACER_INDEX].isReversing,
+      this.currentStates[this.playerRacerIndex].isReversing,
     );
 
-    // 2. Interpolate opponent car views
-    for (let i = 0; i < 5; i++) {
+    // 2. Update directional shadow camera texel-snapped position to follow player
+    this.tierApplier?.updateShadowFollow(playerPos);
+
+    // 3. Interpolate opponent car views
+    for (let i = 0; i < this.opponentCount; i++) {
       this.opponentViews[i].update(this.previousStates[i], this.currentStates[i], alpha);
     }
 
-    // 3. Update HUD readouts
-    const playerState = this.currentStates[PLAYER_RACER_INDEX];
+    // 4. Update HUD readouts
+    const playerState = this.currentStates[this.playerRacerIndex];
     const speedKmh = Math.abs(playerState.speed * 3.6);
     const lapState = this.raceController.getLapTimer().getState();
-    const playerPosition = this.standings.positionOf(PLAYER_RACER_INDEX);
+    const playerPosition = this.standings.positionOf(this.playerRacerIndex);
     const countdown = this.raceController.getCountdownDisplay();
 
     this.hud.update({
@@ -364,7 +380,7 @@ export class RaceSession {
       driftScore: playerState.driftScore,
       driftMultiplier: playerState.driftMultiplier,
       position: playerPosition,
-      totalRacers: TOTAL_RACERS,
+      totalRacers: this.totalRacers,
       currentLap: lapState.currentLap,
       totalLaps: lapState.totalLaps,
       currentLapTimeMs: lapState.currentLapTimeMs,
@@ -376,6 +392,7 @@ export class RaceSession {
 
   public dispose(): void {
     for (const view of this.opponentViews) {
+      this.tierApplier?.unregisterCarView(view);
       this.renderer.scene.remove(view.getRoot());
       view.dispose();
     }

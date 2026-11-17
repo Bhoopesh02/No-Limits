@@ -1,19 +1,21 @@
 import { EventBus } from '../core/EventBus';
 import { GameLoop } from '../core/GameLoop';
 import { DEFAULT_CAR_KAZE } from '../data/CarData';
+import { getCarDetailForTier } from '../data/CarRenderBudget';
 import type { GameEvents } from '../data/GameEvents';
-import { GRAPHICS_TIER_MEDIUM } from '../data/GraphicsTierConfig';
+import { getEffectivePixelRatio } from '../data/GraphicsTierConfig';
 import { createTouchControlState, TouchControlState } from '../data/TouchControlState';
 import { GamepadInput } from '../input/GamepadInput';
 import { InputManager } from '../input/InputManager';
 import { KeyboardInput } from '../input/KeyboardInput';
 import { TouchInput } from '../input/TouchInput';
 import { CameraRig } from '../render/CameraRig';
-import { getCarDetailForTier } from '../data/CarRenderBudget';
 import { CarFactory } from '../render/car/CarFactory';
 import { CarView } from '../render/CarView';
 import { Renderer } from '../render/Renderer';
 import { auditScene } from '../render/sceneAudit';
+import { TierApplier } from '../render/TierApplier';
+import { GraphicsService } from '../services/GraphicsService';
 import { createRotateHint, RotateHintElement } from '../ui/components/RotateHint';
 import { createTouchControls, TouchControlsElement } from '../ui/components/TouchControls';
 import { GameFlow } from './GameFlow';
@@ -25,28 +27,20 @@ export interface AppOptions {
 
 interface DevTools {
   dispose(): void;
-  update(
-    frameDt: number,
-    calls: number,
-    triangles: number,
-    memoryGeometries?: number,
-    memoryTextures?: number,
-  ): void;
+  update(frameDt: number, calls: number, triangles: number, geoms?: number, tex?: number): void;
   recordSimStep?(durationMs: number): void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setGraphicsProvider?(provider: () => any): void;
 }
 
 /**
  * Top-level application bootstrap.
- *
- * Responsibilities:
- * - Instantiates long-lived systems (Renderer, CarView, CameraRig, InputManager, EventBus).
- * - Owns GameFlow which coordinates StateMachine, ScreenManager, and RaceSessions.
- * - Runs the 60 Hz fixed timestep GameLoop with coordinated pause arbitration.
- * - Bridges gamepad input to typed menu navigation events.
  */
 export class App {
   private readonly bus: EventBus<GameEvents>;
+  private readonly graphicsService: GraphicsService;
   private readonly renderer: Renderer;
+  private readonly tierApplier: TierApplier;
   private readonly cameraRig: CameraRig;
   private readonly carFactory: CarFactory;
   private readonly carView: CarView;
@@ -68,7 +62,6 @@ export class App {
   private debugOverlay: DevTools | null = null;
   private tuningPanel: { dispose(): void } | null = null;
 
-  // Gamepad navigation debounce flags
   private prevDpadUp = false;
   private prevDpadDown = false;
   private prevBtnA = false;
@@ -78,38 +71,34 @@ export class App {
     const gameRootId = options.gameRootId ?? 'game-root';
     const uiRootId = options.uiRootId ?? 'ui-root';
 
-    // 1. Shared EventBus
     this.bus = new EventBus<GameEvents>();
+    this.graphicsService = new GraphicsService({ bus: this.bus });
+    this.renderer = new Renderer(gameRootId, uiRootId);
+    this.tierApplier = new TierApplier(this.renderer);
+    this.cameraRig = new CameraRig(this.renderer.camera, { maxSpeed: DEFAULT_CAR_KAZE.topSpeed });
 
-    // 2. Renderer & Camera
-    this.renderer = new Renderer(gameRootId, uiRootId, GRAPHICS_TIER_MEDIUM);
-    this.cameraRig = new CameraRig(this.renderer.camera, {
-      maxSpeed: DEFAULT_CAR_KAZE.topSpeed,
-    });
+    const initialTier = this.graphicsService.getTier();
+    const initialScale = this.graphicsService.getResolutionScale();
+    this.tierApplier.apply(initialTier, initialScale);
 
-    // 3. 3D Car View with shared CarFactory
     this.carFactory = new CarFactory();
-    let carDetail = getCarDetailForTier(GRAPHICS_TIER_MEDIUM.id);
+    let carDetail = getCarDetailForTier(initialTier.id);
     if (import.meta.env.DEV && typeof window !== 'undefined' && window.location) {
-      const params = new URLSearchParams(window.location.search);
-      const queryDetail = params.get('cardetail');
-      if (queryDetail === 'low' || queryDetail === 'medium' || queryDetail === 'high') {
-        carDetail = queryDetail;
-      }
+      const q = new URLSearchParams(window.location.search).get('cardetail');
+      if (q === 'low' || q === 'medium' || q === 'high') carDetail = q;
     }
     this.carView = new CarView({
       factory: this.carFactory,
       detail: carDetail,
       paintColor: DEFAULT_CAR_KAZE.paints[0],
     });
+    this.tierApplier.registerCarView(this.carView);
     this.renderer.scene.add(this.carView.getRoot());
 
-    // 4. Input devices
     this.keyboardInput = new KeyboardInput();
     this.gamepadInput = new GamepadInput();
     this.touchState = createTouchControlState();
     this.touchInput = new TouchInput(this.touchState);
-
     this.inputManager = new InputManager({
       keyboard: this.keyboardInput,
       gamepad: this.gamepadInput,
@@ -117,26 +106,19 @@ export class App {
     });
 
     const uiRoot = document.getElementById(uiRootId);
-    if (!uiRoot) {
-      throw new Error(`Element #${uiRootId} not found.`);
-    }
+    if (!uiRoot) throw new Error(`Element #${uiRootId} not found.`);
 
-    // 5. Touch overlay and rotate hint
     this.touchControls = createTouchControls(this.touchState);
     this.touchControls.style.display = 'none';
     uiRoot.appendChild(this.touchControls);
 
     this.rotateHint = createRotateHint();
     this.rotateHint.onVisibilityChange((showing) => {
-      if (showing) {
-        this.addPauseReason('rotate_hint');
-      } else {
-        this.removePauseReason('rotate_hint');
-      }
+      if (showing) this.addPauseReason('rotate_hint');
+      else this.removePauseReason('rotate_hint');
     });
     uiRoot.appendChild(this.rotateHint);
 
-    // 6. Game Flow & State Machine
     this.gameFlow = new GameFlow({
       uiRoot,
       renderer: this.renderer,
@@ -144,18 +126,25 @@ export class App {
       carView: this.carView,
       carFactory: this.carFactory,
       playerDetail: carDetail,
+      tier: initialTier,
+      tierApplier: this.tierApplier,
       bus: this.bus,
       isTouch: this.touchControls.isVisible(),
       onPauseStateChange: (paused) => {
-        if (paused) {
-          this.addPauseReason('user_pause');
-        } else {
-          this.removePauseReason('user_pause');
-        }
+        if (paused) this.addPauseReason('user_pause');
+        else this.removePauseReason('user_pause');
       },
     });
 
-    // 7. Dev-only tools (debug overlay + tuning panel)
+    this.bus.on('graphics:changed', (payload) => {
+      this.tierApplier.apply(payload.tier, payload.resolutionScale);
+      this.gameFlow.setTier(payload.tier);
+      const state = this.gameFlow.getState();
+      if (state === 'Menu' || state === 'Results' || state === 'Boot') {
+        this.carView.setDetail(getCarDetailForTier(payload.tier.id));
+      }
+    });
+
     if (import.meta.env.DEV) {
       import('../ui/debug').then(({ DebugOverlay, TuningPanel }) => {
         const overlay = new DebugOverlay();
@@ -167,34 +156,54 @@ export class App {
             this.gameFlow.getActiveTrackView()?.group,
           ),
         );
-        this.debugOverlay = overlay;
-        this.tuningPanel = new TuningPanel(DEFAULT_CAR_KAZE, document.body, {
-          getAiPace: () => this.gameFlow.getActiveRaceSession()?.aiPaceScale ?? 1.0,
-          setAiPace: (v) => {
-            const session = this.gameFlow.getActiveRaceSession();
-            if (session) session.aiPaceScale = v;
-          },
-          getRubberBandStrength: () =>
-            this.gameFlow.getActiveRaceSession()?.rubberBandStrength ?? 1.0,
-          setRubberBandStrength: (v) => {
-            const session = this.gameFlow.getActiveRaceSession();
-            if (session) session.rubberBandStrength = v;
-          },
+        overlay.setGraphicsProvider(() => {
+          const tier = this.graphicsService.getTier();
+          const scale = this.graphicsService.getResolutionScale();
+          const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+          const activeSession = this.gameFlow.getActiveRaceSession();
+          return {
+            tierId: tier.id,
+            effectivePixelRatio: getEffectivePixelRatio(dpr, tier.pixelRatioCap, scale),
+            resolutionScale: scale,
+            shadowMode: tier.shadows,
+            cameraFar: tier.cameraFar,
+            opponentCount: activeSession ? activeSession.opponentCount : tier.maxOpponents,
+          };
         });
+        this.debugOverlay = overlay;
+
+        this.tuningPanel = new TuningPanel(
+          DEFAULT_CAR_KAZE,
+          document.body,
+          {
+            getAiPace: () => this.gameFlow.getActiveRaceSession()?.aiPaceScale ?? 1.0,
+            setAiPace: (v) => {
+              const s = this.gameFlow.getActiveRaceSession();
+              if (s) s.aiPaceScale = v;
+            },
+            getRubberBandStrength: () =>
+              this.gameFlow.getActiveRaceSession()?.rubberBandStrength ?? 1.0,
+            setRubberBandStrength: (v) => {
+              const s = this.gameFlow.getActiveRaceSession();
+              if (s) s.rubberBandStrength = v;
+            },
+          },
+          {
+            getTierId: () => this.graphicsService.getTierId(),
+            setTierId: (id) => this.graphicsService.setTier(id),
+            getResolutionScale: () => this.graphicsService.getResolutionScale(),
+            setResolutionScale: (s) => this.graphicsService.setResolutionScale(s),
+          },
+        );
       });
     }
 
-    // 8. Event listeners
     window.addEventListener('keydown', this.onKeyDown);
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.onVisibilityChange);
     }
 
-    // 9. Game loop (60 Hz fixed timestep)
-    this.gameLoop = new GameLoop({
-      update: this.onSimulate,
-      render: this.onRender,
-    });
+    this.gameLoop = new GameLoop({ update: this.onSimulate, render: this.onRender });
   }
 
   public start(): void {
@@ -209,6 +218,14 @@ export class App {
 
   public getGameFlow(): GameFlow {
     return this.gameFlow;
+  }
+
+  public getGraphicsService(): GraphicsService {
+    return this.graphicsService;
+  }
+
+  public getTierApplier(): TierApplier {
+    return this.tierApplier;
   }
 
   public addPauseReason(reason: string): void {
@@ -241,6 +258,7 @@ export class App {
     this.inputManager.dispose();
 
     this.gameFlow.dispose();
+    this.tierApplier.dispose();
     this.carView.dispose();
     this.carFactory.dispose();
     this.cameraRig.dispose();
@@ -250,11 +268,8 @@ export class App {
   }
 
   private readonly onVisibilityChange = (): void => {
-    if (document.hidden) {
-      this.addPauseReason('tab_hidden');
-    } else {
-      this.removePauseReason('tab_hidden');
-    }
+    if (document.hidden) this.addPauseReason('tab_hidden');
+    else this.removePauseReason('tab_hidden');
   };
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
@@ -268,15 +283,11 @@ export class App {
   };
 
   private readonly onSimulate = (fixedDt: number): void => {
-    if (this.isPaused()) {
-      return;
-    }
-
+    if (this.isPaused()) return;
     const t0 = performance.now();
     const input = this.inputManager.poll();
     this.gameFlow.simulate(fixedDt, input);
-    const simDtMs = performance.now() - t0;
-    this.debugOverlay?.recordSimStep?.(simDtMs);
+    this.debugOverlay?.recordSimStep?.(performance.now() - t0);
   };
 
   private readonly onRender = (alpha: number): void => {
@@ -287,7 +298,6 @@ export class App {
     this.gamepadInput.updateCache();
     this.bridgeGamepadMenuNavigation();
 
-    // Sync touch controls visibility with Race state
     const isRaceState = this.gameFlow.getStateMachine().getState() === 'Race';
     if (this.touchControls.isVisible()) {
       this.touchControls.style.display = isRaceState ? 'block' : 'none';
@@ -309,8 +319,7 @@ export class App {
 
   private bridgeGamepadMenuNavigation(): void {
     if (typeof navigator === 'undefined' || !navigator.getGamepads) return;
-    const gamepads = navigator.getGamepads();
-    const pad = gamepads[0];
+    const pad = navigator.getGamepads()[0];
     if (!pad) return;
 
     const dpadUp = pad.buttons[12]?.pressed ?? false;
@@ -318,18 +327,10 @@ export class App {
     const btnA = pad.buttons[0]?.pressed ?? false;
     const btnB = pad.buttons[1]?.pressed ?? false;
 
-    if (dpadUp && !this.prevDpadUp) {
-      this.bus.emit('menu:navigate', 'up');
-    }
-    if (dpadDown && !this.prevDpadDown) {
-      this.bus.emit('menu:navigate', 'down');
-    }
-    if (btnA && !this.prevBtnA) {
-      this.bus.emit('menu:navigate', 'confirm');
-    }
-    if (btnB && !this.prevBtnB) {
-      this.bus.emit('menu:navigate', 'back');
-    }
+    if (dpadUp && !this.prevDpadUp) this.bus.emit('menu:navigate', 'up');
+    if (dpadDown && !this.prevDpadDown) this.bus.emit('menu:navigate', 'down');
+    if (btnA && !this.prevBtnA) this.bus.emit('menu:navigate', 'confirm');
+    if (btnB && !this.prevBtnB) this.bus.emit('menu:navigate', 'back');
 
     this.prevDpadUp = dpadUp;
     this.prevDpadDown = dpadDown;

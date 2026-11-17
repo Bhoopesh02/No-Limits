@@ -154,4 +154,63 @@ describe('RaceSession lifecycle and disposal', () => {
     carFactory.dispose();
     expect(trackViewDisposedCount).toBe(5);
   });
+
+  it.each([3, 4, 5])('supports variable opponent counts (%i opponents)', (oppCount) => {
+    const sceneChildren: unknown[] = [];
+    const mockTrackView = {
+      group: { id: 'track-group' },
+      dispose: () => {},
+    };
+    const mockScene = {
+      add: (obj: unknown) => sceneChildren.push(obj),
+      remove: (obj: unknown) => {
+        const idx = sceneChildren.indexOf(obj);
+        if (idx !== -1) sceneChildren.splice(idx, 1);
+      },
+    };
+    const mockRenderer = {
+      scene: mockScene,
+      camera: { position: { set: () => {} }, lookAt: () => {} },
+      getAspect: () => 1.77,
+    };
+    const mockCameraRig = {
+      teleport: () => {},
+      update: () => {},
+    };
+    const mockCarView = {
+      getPosition: () => ({ x: 0, y: 0, z: 0 }),
+      getHeading: () => 0,
+      update: () => {},
+    };
+    const uiRoot = createMockElement('div');
+    const bus = new EventBus<GameEvents>();
+    const spline = new Spline(dummyTrackData.controlPoints, 1.0);
+    const carFactory = new CarFactory();
+
+    const session = new RaceSession({
+      renderer: mockRenderer as never,
+      cameraRig: mockCameraRig as never,
+      carView: mockCarView as never,
+      carFactory,
+      playerDetail: 'low',
+      opponentCount: oppCount,
+      trackData: dummyTrackData,
+      carData: DEFAULT_CAR_KAZE,
+      spline,
+      trackView: mockTrackView as never,
+      bus,
+      uiRoot: uiRoot as never,
+      isTouch: false,
+    });
+
+    expect(session.opponentCount).toBe(oppCount);
+    expect(session.totalRacers).toBe(oppCount + 1);
+    expect(session.playerRacerIndex).toBe(oppCount);
+    // 1 track view + oppCount opponent views
+    expect(sceneChildren.length).toBe(1 + oppCount);
+
+    session.dispose();
+    expect(sceneChildren.length).toBe(0);
+    carFactory.dispose();
+  });
 });

@@ -2,7 +2,8 @@ import { StateMachine } from '../core/StateMachine';
 import type { EventBus, Unsubscribe } from '../core/EventBus';
 import type { GameEvents } from '../data/GameEvents';
 import { GAME_STATE_TRANSITIONS, GameState } from '../data/GameState';
-import type { CarDetailLevel } from '../data/CarRenderBudget';
+import { getCarDetailForTier, type CarDetailLevel } from '../data/CarRenderBudget';
+import type { GraphicsTierConfig } from '../data/GraphicsTierConfig';
 import type { InputState } from '../data/InputState';
 import type { RaceResult } from '../data/RaceResult';
 import { Spline } from '../race/Spline';
@@ -11,6 +12,7 @@ import type { CameraRig } from '../render/CameraRig';
 import type { CarFactory } from '../render/car/CarFactory';
 import type { CarView } from '../render/CarView';
 import type { Renderer } from '../render/Renderer';
+import type { TierApplier } from '../render/TierApplier';
 import type { TrackView } from '../render/TrackView';
 import { ScreenManager } from '../ui/ScreenManager';
 import { BootScreen } from '../ui/screens/BootScreen';
@@ -27,6 +29,8 @@ export interface GameFlowOptions {
   readonly carView: CarView;
   readonly carFactory?: CarFactory;
   readonly playerDetail?: CarDetailLevel;
+  readonly tier?: GraphicsTierConfig;
+  readonly tierApplier?: TierApplier;
   readonly bus: EventBus<GameEvents>;
   readonly isTouch: boolean;
   readonly onPauseStateChange?: (isPaused: boolean) => void;
@@ -42,6 +46,8 @@ export class GameFlow {
   private readonly bus: EventBus<GameEvents>;
   private readonly isTouch: boolean;
   private readonly onPauseStateChange?: (isPaused: boolean) => void;
+  private readonly tierApplier?: TierApplier;
+  private tier?: GraphicsTierConfig;
 
   private readonly stateMachine: StateMachine<GameState>;
   private readonly screenManager: ScreenManager;
@@ -63,6 +69,8 @@ export class GameFlow {
     this.bus = options.bus;
     this.isTouch = options.isTouch;
     this.onPauseStateChange = options.onPauseStateChange;
+    this.tier = options.tier;
+    this.tierApplier = options.tierApplier;
 
     // 1. State machine
     this.stateMachine = new StateMachine<GameState>({
@@ -202,12 +210,20 @@ export class GameFlow {
       .then((assets) => {
         // Build new RaceSession
         this.raceSession?.dispose();
+        const detail = this.tier
+          ? getCarDetailForTier(this.tier.id)
+          : (this.playerDetail ?? 'medium');
+        const opponents = this.tier?.maxOpponents ?? 5;
+        this.carView.setDetail(detail);
+
         this.raceSession = new RaceSession({
           renderer: this.renderer,
           cameraRig: this.cameraRig,
           carView: this.carView,
           carFactory: this.carFactory,
-          playerDetail: this.playerDetail,
+          playerDetail: detail,
+          opponentCount: opponents,
+          tierApplier: this.tierApplier,
           trackData: assets.trackData,
           carData: assets.carData,
           spline: assets.spline as Spline,
@@ -234,6 +250,14 @@ export class GameFlow {
     if (this.stateMachine.getState() === 'Race' && this.raceSession) {
       this.raceSession.render(alpha, frameDt);
     }
+  }
+
+  public setTier(tier: GraphicsTierConfig): void {
+    this.tier = tier;
+  }
+
+  public getState(): GameState {
+    return this.stateMachine.getState();
   }
 
   public dispose(): void {

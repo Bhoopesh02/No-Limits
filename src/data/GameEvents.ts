@@ -1,7 +1,13 @@
 import type { GameState } from './GameState';
+import type { GraphicsTierConfig } from './GraphicsTierConfig';
 import type { RacePhase, RaceResult } from './RaceResult';
 
 export type MenuNavigationAction = 'up' | 'down' | 'confirm' | 'back';
+
+export interface GraphicsChangedPayload {
+  readonly tier: GraphicsTierConfig;
+  readonly resolutionScale: number;
+}
 
 export interface StateEnterPayload<TState extends string = GameState> {
   state: TState;
@@ -46,4 +52,5 @@ export interface GameEvents {
   'race:pause': boolean;
 
   'menu:navigate': MenuNavigationAction;
+  'graphics:changed': GraphicsChangedPayload;
 }

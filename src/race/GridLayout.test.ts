@@ -7,7 +7,7 @@ describe('GridLayout', () => {
   const spline = new Spline(trackJson.controlPoints, 1.0);
   const slots = buildGridLayout(spline);
 
-  it('generates exactly 6 slots with player assigned to the last slot', () => {
+  it('generates exactly 6 slots with player assigned to the last slot by default', () => {
     expect(slots.length).toBe(GRID_TOTAL_SLOTS);
     expect(slots[GRID_PLAYER_SLOT_INDEX].isPlayer).toBe(true);
 
@@ -49,6 +49,57 @@ describe('GridLayout', () => {
       expect(Number.isNaN(slot.x)).toBe(false);
       expect(Number.isNaN(slot.z)).toBe(false);
       expect(Number.isNaN(slot.heading)).toBe(false);
+    }
+  });
+
+  it.each([4, 5, 6])(
+    'supports variable racer count N = %i without overlap and with player at last slot',
+    (totalRacers) => {
+      const nSlots = buildGridLayout(spline, totalRacers);
+      expect(nSlots.length).toBe(totalRacers);
+      expect(nSlots[totalRacers - 1].isPlayer).toBe(true);
+
+      for (let i = 0; i < totalRacers - 1; i++) {
+        expect(nSlots[i].isPlayer).toBe(false);
+      }
+
+      // Pole is furthest ahead, player is closest to start line
+      expect(nSlots[0].distance).toBeGreaterThanOrEqual(nSlots[totalRacers - 1].distance);
+
+      // No overlaps
+      for (let i = 0; i < nSlots.length; i++) {
+        for (let j = i + 1; j < nSlots.length; j++) {
+          const dx = nSlots[i].x - nSlots[j].x;
+          const dy = nSlots[i].y - nSlots[j].y;
+          const dz = nSlots[i].z - nSlots[j].z;
+          const dist = Math.hypot(dx, dy, dz);
+          expect(dist, `Slots ${i} and ${j} overlap (distance ${dist}m)`).toBeGreaterThan(5.0);
+        }
+      }
+    },
+  );
+
+  it.each([4, 5, 6])('supports variable racer count N = %i without overlap and with player at last slot', (totalRacers) => {
+    const nSlots = buildGridLayout(spline, totalRacers);
+    expect(nSlots.length).toBe(totalRacers);
+    expect(nSlots[totalRacers - 1].isPlayer).toBe(true);
+
+    for (let i = 0; i < totalRacers - 1; i++) {
+      expect(nSlots[i].isPlayer).toBe(false);
+    }
+
+    // Pole is furthest ahead, player is closest to start line
+    expect(nSlots[0].distance).toBeGreaterThanOrEqual(nSlots[totalRacers - 1].distance);
+
+    // No overlaps
+    for (let i = 0; i < nSlots.length; i++) {
+      for (let j = i + 1; j < nSlots.length; j++) {
+        const dx = nSlots[i].x - nSlots[j].x;
+        const dy = nSlots[i].y - nSlots[j].y;
+        const dz = nSlots[i].z - nSlots[j].z;
+        const dist = Math.hypot(dx, dy, dz);
+        expect(dist, `Slots ${i} and ${j} overlap (distance ${dist}m)`).toBeGreaterThan(5.0);
+      }
     }
   });
 });

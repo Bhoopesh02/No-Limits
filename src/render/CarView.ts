@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Group } from 'three';
 import { getCarDetailForTier, type CarDetailLevel } from '../data/CarRenderBudget';
+import { BlobShadow } from './BlobShadow';
 import { CarFactory, type CarInstance } from './car/CarFactory';
 import type { KazeWheels } from './car/carWheels';
 import { lerp, lerpAngle } from './cameraMath';
@@ -32,7 +33,10 @@ export class CarView {
   private readonly chassisGroup: Group = new Group();
   private readonly factory: CarFactory;
   private readonly ownsFactory: boolean;
-  private readonly carInstance: CarInstance;
+  private readonly blobShadow: BlobShadow;
+  private carInstance: CarInstance;
+  private currentDetail: CarDetailLevel;
+  private currentPaintColor: string | number | THREE.Color;
 
   private posX = 0;
   private posY = 0;
@@ -55,10 +59,15 @@ export class CarView {
       this.ownsFactory = true;
     }
 
-    const detail: CarDetailLevel =
+    this.currentDetail =
       options.detail ?? (options.tier ? getCarDetailForTier(options.tier) : 'medium');
-    this.carInstance = this.factory.create(detail, options.paintColor ?? 0x3da5ff);
+    this.currentPaintColor = options.paintColor ?? 0x3da5ff;
+    this.carInstance = this.factory.create(this.currentDetail, this.currentPaintColor);
     this.chassisGroup.add(this.carInstance.root);
+
+    this.blobShadow = new BlobShadow();
+    this.blobShadow.setVisible(options.tier === 'low');
+    this.root.add(this.blobShadow.mesh);
   }
 
   public getRoot(): Group {
@@ -89,7 +98,27 @@ export class CarView {
   }
 
   public setPaintColor(color: string | number | THREE.Color): void {
+    this.currentPaintColor = color;
     this.carInstance.setPaintColor(color);
+  }
+
+  public setBlobShadowVisible(visible: boolean): void {
+    this.blobShadow.setVisible(visible);
+  }
+
+  public setDetail(detail: CarDetailLevel): void {
+    if (this.currentDetail === detail) {
+      return;
+    }
+    this.currentDetail = detail;
+    this.chassisGroup.remove(this.carInstance.root);
+    this.carInstance.dispose();
+    this.carInstance = this.factory.create(detail, this.currentPaintColor);
+    this.chassisGroup.add(this.carInstance.root);
+  }
+
+  public getDetail(): CarDetailLevel {
+    return this.currentDetail;
   }
 
   public setReversing(isReversing: boolean): void {
@@ -153,6 +182,7 @@ export class CarView {
   }
 
   public dispose(): void {
+    this.blobShadow.dispose();
     this.carInstance.dispose();
     if (this.ownsFactory) {
       this.factory.dispose();

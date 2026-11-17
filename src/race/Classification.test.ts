@@ -47,4 +47,29 @@ describe('buildClassification', () => {
     expect(classification[5].finished).toBe(false);
     expect(classification[5].formattedTimeOrGap).toBe('+200m'); // 1000m - 800m
   });
+
+  it.each([3, 4, 5])('formats classification correctly for %i opponents', (opponentCount) => {
+    const totalRacers = opponentCount + 1;
+    const playerIndex = opponentCount;
+    const trackLength = 1000;
+    const standings = new Standings(trackLength, totalRacers);
+    const lapTimers = Array.from({ length: totalRacers }, () => new LapTimer(trackLength, 1));
+
+    const initialDistances = Array.from({ length: totalRacers }, (_, i) => 1000 - i * 50);
+    standings.reset(initialDistances);
+    standings.sort();
+
+    const classification = buildClassification(
+      standings,
+      lapTimers,
+      OPPONENT_ROSTER,
+      playerIndex,
+      30000,
+    );
+
+    expect(classification.length).toBe(totalRacers);
+    const playerEntry = classification.find((e) => e.isPlayer);
+    expect(playerEntry).toBeDefined();
+    expect(playerEntry?.driverName).toBe('Player');
+  });
 });

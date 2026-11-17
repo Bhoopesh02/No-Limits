@@ -5,6 +5,15 @@ export interface DebugAuditStats {
   readonly triangles: number;
 }
 
+export interface DebugGraphicsStats {
+  readonly tierId: string;
+  readonly effectivePixelRatio: number;
+  readonly resolutionScale: number;
+  readonly shadowMode: string;
+  readonly cameraFar: number;
+  readonly opponentCount: number;
+}
+
 export interface DebugAuditData {
   readonly geometries: number;
   readonly textures: number;
@@ -25,6 +34,7 @@ export class DebugOverlay {
   private readonly auditEl: HTMLElement;
   private visible = false;
   private auditProvider: (() => DebugAuditData) | null = null;
+  private graphicsProvider: (() => DebugGraphicsStats) | null = null;
 
   private frameCount = 0;
   private lastFpsTime = performance.now();
@@ -83,6 +93,10 @@ export class DebugOverlay {
     this.auditProvider = provider;
   }
 
+  public setGraphicsProvider(provider: () => DebugGraphicsStats): void {
+    this.graphicsProvider = provider;
+  }
+
   public update(
     frameDt: number,
     calls: number,
@@ -102,6 +116,15 @@ export class DebugOverlay {
       this.frameCount = 0;
       this.lastFpsTime = now;
 
+      let graphicsHtml = '';
+      if (this.graphicsProvider) {
+        const g = this.graphicsProvider();
+        graphicsHtml = `
+          <div>Tier: <strong style="color: var(--text-primary);">${g.tierId.toUpperCase()}</strong> | DPR: <strong style="color: var(--text-primary);">${g.effectivePixelRatio.toFixed(2)}</strong> (Scale: <strong style="color: var(--text-primary);">${g.resolutionScale.toFixed(2)}</strong>)</div>
+          <div>Shadows: <strong style="color: var(--text-primary);">${g.shadowMode}</strong> | Far: <strong style="color: var(--text-primary);">${g.cameraFar}m</strong> | Opponents: <strong style="color: var(--text-primary);">${g.opponentCount}</strong></div>
+        `;
+      }
+
       const memHtml =
         memoryGeometries !== undefined
           ? `<div>Memory: Geoms: <strong style="color: var(--text-primary);">${memoryGeometries}</strong> | Tex: <strong style="color: var(--text-primary);">${memoryTextures ?? 0}</strong></div>`
@@ -110,6 +133,7 @@ export class DebugOverlay {
       this.liveStatsEl.innerHTML = `
         <div style="color: var(--accent); font-weight: 700; margin-bottom: 2px;">DEV STATS [\`]</div>
         <div>FPS: <strong style="color: var(--text-primary);">${this.currentFps}</strong> (${this.currentFrameTime.toFixed(1)}ms) | Sim: <strong style="color: var(--text-primary);">${this.avgSimStepTimeMs.toFixed(2)}ms</strong></div>
+        ${graphicsHtml}
         <div>Calls: <strong style="color: var(--text-primary);">${calls}</strong> | Tris: <strong style="color: var(--text-primary);">${triangles.toLocaleString()}</strong></div>
         ${memHtml}
       `;

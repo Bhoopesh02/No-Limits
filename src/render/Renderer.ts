@@ -1,6 +1,7 @@
 import {
   Color,
   DirectionalLight,
+  Fog,
   GridHelper,
   HemisphereLight,
   Mesh,
@@ -10,7 +11,6 @@ import {
   Scene,
   WebGLRenderer,
 } from 'three';
-import { GRAPHICS_TIER_MEDIUM, GraphicsTierConfig } from '../data/GraphicsTierConfig';
 
 export function isWebGL2Supported(): boolean {
   try {
@@ -27,20 +27,15 @@ export class Renderer {
   public readonly webglRenderer: WebGLRenderer;
   private readonly gameRoot: HTMLElement;
   private readonly resizeObserver: ResizeObserver;
-  private readonly tierConfig: GraphicsTierConfig;
 
+  private currentWidth = 800;
+  private currentHeight = 450;
   private groundMesh: Mesh | null = null;
   private gridHelper: GridHelper | null = null;
   private hemiLight: HemisphereLight | null = null;
   private dirLight: DirectionalLight | null = null;
 
-  constructor(
-    gameRootId = 'game-root',
-    uiRootId = 'ui-root',
-    tierConfig: GraphicsTierConfig = GRAPHICS_TIER_MEDIUM,
-  ) {
-    this.tierConfig = tierConfig;
-
+  constructor(gameRootId = 'game-root', uiRootId = 'ui-root') {
     // Check WebGL2 support
     if (!isWebGL2Supported()) {
       const uiRoot = document.getElementById(uiRootId);
@@ -70,10 +65,10 @@ export class Renderer {
     this.scene.background = new Color(0x0b0e14); // bg.base
 
     // 2. Camera
-    const initialWidth = this.gameRoot.clientWidth || 800;
-    const initialHeight = this.gameRoot.clientHeight || 450;
-    const aspect = initialWidth / initialHeight;
-    this.camera = new PerspectiveCamera(60, aspect, 0.1, this.tierConfig.drawDistance);
+    this.currentWidth = this.gameRoot.clientWidth || 800;
+    this.currentHeight = this.gameRoot.clientHeight || 450;
+    const aspect = this.currentWidth / this.currentHeight;
+    this.camera = new PerspectiveCamera(60, aspect, 0.1, 900);
     this.camera.position.set(0, 3, 8);
 
     // 3. WebGLRenderer
@@ -81,10 +76,8 @@ export class Renderer {
       antialias: true,
       powerPreference: 'high-performance',
     });
-    this.webglRenderer.setPixelRatio(
-      Math.min(window.devicePixelRatio || 1, this.tierConfig.pixelRatioCap),
-    );
-    this.webglRenderer.setSize(initialWidth, initialHeight, false);
+    this.webglRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    this.webglRenderer.setSize(this.currentWidth, this.currentHeight, false);
     this.webglRenderer.domElement.style.display = 'block';
     this.webglRenderer.domElement.style.width = '100%';
     this.webglRenderer.domElement.style.height = '100%';
@@ -109,7 +102,7 @@ export class Renderer {
   }
 
   private setupEnvironment(): void {
-    // Flat ground plane
+    // Flat ground plane (receives shadows)
     const groundGeom = new PlaneGeometry(4000, 4000);
     const groundMat = new MeshStandardMaterial({
       color: 0x121722, // surface.1
@@ -119,6 +112,7 @@ export class Renderer {
     this.groundMesh = new Mesh(groundGeom, groundMat);
     this.groundMesh.rotation.x = -Math.PI / 2;
     this.groundMesh.position.y = 0;
+    this.groundMesh.receiveShadow = true;
     this.scene.add(this.groundMesh);
 
     // Grid helper for speed / distance perception
@@ -134,9 +128,36 @@ export class Renderer {
     this.dirLight = new DirectionalLight(0xfff5e6, 1.25);
     this.dirLight.position.set(60, 100, 40);
     this.scene.add(this.dirLight);
+    this.scene.add(this.dirLight.target);
+  }
+
+  public setEffectivePixelRatio(pixelRatio: number): void {
+    this.webglRenderer.setPixelRatio(pixelRatio);
+    this.setSize(this.currentWidth, this.currentHeight);
+  }
+
+  public setDrawDistance(far: number): void {
+    this.camera.far = far;
+    this.camera.updateProjectionMatrix();
+  }
+
+  public setFog(near: number, far: number, color = 0x0b0e14): void {
+    if (this.scene.fog instanceof Fog) {
+      this.scene.fog.near = near;
+      this.scene.fog.far = far;
+      this.scene.fog.color.set(color);
+    } else {
+      this.scene.fog = new Fog(color, near, far);
+    }
+  }
+
+  public getDirectionalLight(): DirectionalLight | null {
+    return this.dirLight;
   }
 
   public setSize(width: number, height: number): void {
+    this.currentWidth = width;
+    this.currentHeight = height;
     this.webglRenderer.setSize(width, height, false);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
@@ -176,6 +197,10 @@ export class Renderer {
     }
 
     if (this.dirLight) {
+      if (this.dirLight.shadow.map) {
+        this.dirLight.shadow.map.dispose();
+      }
+      this.scene.remove(this.dirLight.target);
       this.scene.remove(this.dirLight);
     }
 

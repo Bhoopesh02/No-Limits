@@ -1,5 +1,6 @@
 import { CarData, DEFAULT_CAR_KAZE } from '../../data/CarData';
 import { createButton } from '../components/Button';
+import { createDropdown } from '../components/Dropdown';
 import { createSlider } from '../components/Slider';
 
 export interface AiTuningDevControls {
@@ -9,20 +10,30 @@ export interface AiTuningDevControls {
   setRubberBandStrength: (val: number) => void;
 }
 
+export interface GraphicsDevControls {
+  getTierId: () => 'low' | 'medium' | 'high';
+  setTierId: (tierId: 'low' | 'medium' | 'high') => void;
+  getResolutionScale: () => number;
+  setResolutionScale: (scale: number) => void;
+}
+
 export class TuningPanel {
   private readonly container: HTMLElement;
   private readonly sliderListEl: HTMLElement;
   private readonly liveCarData: CarData;
   private readonly aiDevControls?: AiTuningDevControls;
+  private readonly graphicsDevControls?: GraphicsDevControls;
   private visible = false;
 
   constructor(
     liveCarData: CarData,
     parent: HTMLElement = document.body,
     aiDevControls?: AiTuningDevControls,
+    graphicsDevControls?: GraphicsDevControls,
   ) {
     this.liveCarData = liveCarData;
     this.aiDevControls = aiDevControls;
+    this.graphicsDevControls = graphicsDevControls;
 
     this.container = document.createElement('div');
     this.container.style.cssText = `
@@ -251,6 +262,41 @@ export class TuningPanel {
         onChange: (v) => this.aiDevControls?.setRubberBandStrength(v),
       });
       this.sliderListEl.appendChild(rubberBandSlider);
+    }
+
+    if (this.graphicsDevControls) {
+      const gfxHeader = document.createElement('div');
+      gfxHeader.style.cssText =
+        'font-family: var(--font-display); font-weight: 700; font-size: var(--fs-14); color: var(--accent); margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--border);';
+      gfxHeader.textContent = 'GRAPHICS TIERS';
+      this.sliderListEl.appendChild(gfxHeader);
+
+      const tierDropdown = createDropdown({
+        label: 'Graphics Tier',
+        items: [
+          { value: 'low', label: 'Low' },
+          { value: 'medium', label: 'Medium' },
+          { value: 'high', label: 'High' },
+        ],
+        value: this.graphicsDevControls.getTierId(),
+        onChange: (v) => {
+          this.graphicsDevControls?.setTierId(v as 'low' | 'medium' | 'high');
+        },
+      });
+      this.sliderListEl.appendChild(tierDropdown);
+
+      const scaleSlider = createSlider({
+        label: 'Resolution Scale',
+        value: this.graphicsDevControls.getResolutionScale(),
+        min: 0.6,
+        max: 1.0,
+        step: 0.05,
+        unit: '',
+        onChange: (v) => {
+          this.graphicsDevControls?.setResolutionScale(v);
+        },
+      });
+      this.sliderListEl.appendChild(scaleSlider);
     }
   }
 
